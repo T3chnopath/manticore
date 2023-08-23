@@ -23,10 +23,6 @@
             ];
           };
 
-          dockerImage = pkgsUnstable.dockerTools.buildNixShellImage {
-            tag = "latest";
-            drv = default.overrideAttrs (old: { src = null; });
-          };
         };
       });
 }
