@@ -17,12 +17,9 @@
             name = "manticore";
             src = ./.;
 
-            nativeBuildInputs = with pkgs; [
-              cmake
-            ];
-
             buildInputs = with pkgs; [
               python39
+              cmake
             ];
           };
 
