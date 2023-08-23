@@ -1,5 +1,5 @@
 {
-  description = "OpenTechLab C++ Application Example";
+  description = "Manticore Flake";
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-22.11";
