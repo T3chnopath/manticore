@@ -5,6 +5,7 @@
     nixpkgs.url = "nixpkgs/nixos-22.11";
     nixpkgsUnstable.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    threadx.url = "github:azure-rtos/threadx";
   };
 
   outputs = { self, nixpkgs, nixpkgsUnstable, flake-utils }:
@@ -19,6 +20,7 @@
 
             buildInputs = with pkgs; [
               python39
+              threadx
               cmake
             ];
           };
