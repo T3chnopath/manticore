@@ -8,7 +8,7 @@
     threadx.url = "github:azure-rtos/threadx";
   };
 
-  outputs = { self, nixpkgs, nixpkgsUnstable, flake-utils }:
+  outputs = { self, nixpkgs, nixpkgsUnstable, flake-utils, threadx }:
     flake-utils.lib.eachDefaultSystem (system: let
         pkgs = import nixpkgs { inherit system; };
         pkgsUnstable = import nixpkgsUnstable { inherit system; };
