@@ -33,26 +33,11 @@
         "type": "indirect"
       }
     },
-    "nixpkgsUnstable": {
-      "locked": {
-        "lastModified": 1692638711,
-        "narHash": "sha256-J0LgSFgJVGCC1+j5R2QndadWI1oumusg6hCtYAzLID4=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "91a22f76cd1716f9d0149e8a5c68424bb691de15",
-        "type": "github"
-      },
-      "original": {
-        "id": "nixpkgs",
-        "ref": "nixos-unstable",
-        "type": "indirect"
-      }
-    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
-        "nixpkgsUnstable": "nixpkgsUnstable"
+        "threadx": "threadx"
       }
     },
     "systems": {
@@ -67,6 +52,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "threadx": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1691400931,
+        "narHash": "sha256-7UdVgtdzqjruZxuYpzqJNNbl/bAkgdl4BfBLX2+VVj8=",
+        "owner": "azure-rtos",
+        "repo": "threadx",
+        "rev": "bc8bed494d3a37eea022c1385008bdab991f3370",
+        "type": "github"
+      },
+      "original": {
+        "owner": "azure-rtos",
+        "repo": "threadx",
         "type": "github"
       }
     }
