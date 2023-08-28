@@ -1,1 +1,1 @@
-This directory is for 3rd Party External packages
+This directory is for 3rd Party External packages.
