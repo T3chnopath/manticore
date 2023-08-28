@@ -1,0 +1,1 @@
+This folder provides common, in-house code.
