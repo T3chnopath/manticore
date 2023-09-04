@@ -1,6 +1,11 @@
 add_subdirectory(IT_Handler)
 add_subdirectory(BSP)
-add_executable(Demo main.c)
+
+
+add_executable(Demo 
+    main.c
+    ${STARTUP_SCRIPT}
+    )
 
 target_include_directories(Demo PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/
