@@ -1,5 +1,5 @@
 # Create the library
-add_library(HAL INTERFACE
+add_library(HAL
     source/stm32h5xx_hal_adc.c
     source/stm32h5xx_hal_adc_ex.c
     source/stm32h5xx_hal.c
@@ -72,9 +72,6 @@ add_library(HAL INTERFACE
     source/stm32h5xx_hal_spi_ex.c
     source/stm32h5xx_hal_sram.c
     source/stm32h5xx_hal_tim.c
-    source/stm32h5xx_hal_timebase_rtc_alarm_template.c
-    source/stm32h5xx_hal_timebase_rtc_wakeup_template.c
-    source/stm32h5xx_hal_timebase_tim_template.c
     source/stm32h5xx_hal_tim_ex.c
     source/stm32h5xx_hal_uart.c
     source/stm32h5xx_hal_uart_ex.c
@@ -115,7 +112,12 @@ add_library(HAL INTERFACE
     source/stm32h5xx_util_i3c.c
 )
 
+target_link_libraries(HAL CMSIS)
+
+target_compile_definitions(HAL INTERFACE USE_HAL_DRIVER=TRUE)
+
 # Include headers
-target_include_directories(HAL INTERFACE
+target_include_directories(HAL PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/legacy
 )

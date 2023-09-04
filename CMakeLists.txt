@@ -1,12 +1,22 @@
-project(MantiCore LANGUAGES C CXX)
 cmake_minimum_required(VERSION 3.22)
+project(MantiCore LANGUAGES C ASM)
+
+enable_language(C ASM)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+set(CMAKE_C_COMPILER "arm-none-eabi-gcc")
+set(CMAKE_ASM_COMPILER "arm-none-eabi-gcc")
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 
 set(MCU "STM32H563")
+set (MCPU                     "-mcpu=cortex-m33")
+set (MFPU                     "-mfpu=fpv5-sp-d16")
+set (MFLOAT_ABI               "-mfloat-abi=hard")
+set (CMAKE_C_FLAGS "${MCPU} ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY} -std=c99 -mthumb -Wall -Werror --specs=nosys.specs")
+
 add_subdirectory(mcu_support)
 add_subdirectory(DemoNucleoH563)
 
-set (MCPU                     "-mcpu=Cortex-M33")
-set (CMAKE_C_FLAGS "${MCPU} -std=gnu11 ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY} -mthumb -Wall -Werror -stdlib=libc")
-set (CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")

@@ -1,7 +1,6 @@
 add_subdirectory(IT_Handler)
 add_subdirectory(BSP)
 
-
 add_executable(Demo 
     main.c
     ${STARTUP_SCRIPT}
