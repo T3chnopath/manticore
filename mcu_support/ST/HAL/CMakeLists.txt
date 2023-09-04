@@ -1,5 +1,5 @@
 # Create the library
-add_library(HAL
+add_library(HAL INTERFACE
     source/stm32h5xx_hal_adc.c
     source/stm32h5xx_hal_adc_ex.c
     source/stm32h5xx_hal.c
@@ -116,6 +116,6 @@ add_library(HAL
 )
 
 # Include headers
-target_include_directories(HAL PUBLIC 
+target_include_directories(HAL INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
