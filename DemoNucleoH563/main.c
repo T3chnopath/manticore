@@ -43,7 +43,8 @@ int main(void)
   
   while (1)
   {
-  
+    HAL_Delay(1000);
+    HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
   }
 }
 
