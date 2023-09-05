@@ -19,7 +19,6 @@ set (CMAKE_C_FLAGS "${MCPU} ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY} -D__ARM_FEA
 add_compile_definitions(USE_HAL_DRIVER=TRUE)
 add_compile_definitions(USE_FULL_LL_DRIVER=TRUE)
 
-
 add_subdirectory(mcu_support)
 add_subdirectory(DemoNucleoH563)
 
