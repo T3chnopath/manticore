@@ -109,15 +109,12 @@ add_library(HAL
     source/stm32h5xx_ll_usart.c
     source/stm32h5xx_ll_usb.c
     source/stm32h5xx_ll_utils.c
-    source/stm32h5xx_util_i3c.c
 )
 
 target_link_libraries(HAL CMSIS)
 
-target_compile_definitions(HAL INTERFACE USE_HAL_DRIVER=TRUE)
-
 # Include headers
 target_include_directories(HAL PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/include/legacy
 )
