@@ -105,11 +105,6 @@ void BSP_GPIO_Init(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(LED3_RED_GPIO_Port, &GPIO_InitStruct);
 
-    // Configure GPIO pin : UCPD_FLT_Pin
-    GPIO_InitStruct.Pin = UCPD_FLT_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(UCPD_FLT_GPIO_Port, &GPIO_InitStruct);
 }
 
 void BSP_Error_Handler(void)
