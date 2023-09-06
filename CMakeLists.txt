@@ -18,7 +18,7 @@ set(MCU "STM32H563")
 set (MCPU                     "-mcpu=cortex-m33")
 set (MFPU                     "-mfpu=fpv5-sp-d16")
 set (MFLOAT_ABI               "-mfloat-abi=hard")
-set (CMAKE_C_FLAGS "-DCMAKE_BUILD_TYPE=Debug -g3 ${MCPU} ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY} -D__ARM_FEATURE_CMSE=3U -std=c99 -mthumb -Wall -Wconversion -Wextra --specs=nosys.specs")
+set (CMAKE_C_FLAGS "-DCMAKE_BUILD_TYPE=Debug -g3 ${MCPU} ${MFPU} ${MFLOAT_ABI} ${RUNTIME_LIBRARY}-std=c99 -mthumb -Wall -Wno-conversion -Wno-unused-parameter -Wextra --specs=nosys.specs")
 
 add_compile_definitions(USE_HAL_DRIVER=TRUE)
 add_compile_definitions(USE_FULL_LL_DRIVER=TRUE)
