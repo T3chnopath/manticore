@@ -1,5 +1,5 @@
-#include "main.h"
 #include "string.h"
+#include "bsp_nucleo_h563.h"
 
 UART_HandleTypeDef hlpuart1;
 UART_HandleTypeDef huart3;

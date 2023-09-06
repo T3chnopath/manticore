@@ -1,6 +1,6 @@
 # Create BSP Library
 add_library(BSP
-    nucleo_h563.c
+    bsp_nucleo_h563.c
 )
 
 # Include header
