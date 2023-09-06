@@ -16,6 +16,7 @@ target_include_directories(Demo.elf PUBLIC
 )
 
 target_link_libraries(Demo.elf
+    threadx
     CMSIS
     HAL
     BSP

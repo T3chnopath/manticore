@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 
-# Set up the project
-project(threadx
-    LANGUAGES C ASM
-)
+set(PROJECT_NAME "threadx")
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/cortex_m33.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/arm-none-eabi.cmake)
 
 if(NOT DEFINED THREADX_ARCH)
     message(FATAL_ERROR "Error: THREADX_ARCH not defined")
