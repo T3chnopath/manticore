@@ -11,8 +11,8 @@
 #include "stm32h5xx_ll_gpio.h"
 
 // Pin Definitions
-#define LED1_GREEN_Pin GPIO_PIN_0
-#define LED1_GREEN_GPIO_Port GPIOB
+#define LED1_GREEN_Pin GPIO_PIN_5
+#define LED1_GREEN_GPIO_Port GPIOA
 
 // Public Functions
 void BSP_Error_Handler(void);

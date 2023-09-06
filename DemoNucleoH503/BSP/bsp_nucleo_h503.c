@@ -1,4 +1,4 @@
-#include "bsp_nucleo_h563.h"
+#include "bsp_nucleo_h503.h"
 
 void BSP_SystemClock_Config(void)
 {
@@ -60,7 +60,7 @@ void BSP_GPIO_Init(void)
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     // GPIO Ports Clock Enable
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
 
     // Configure GPIO pin Output Level
     HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_RESET);

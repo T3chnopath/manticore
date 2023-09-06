@@ -9,7 +9,7 @@ set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(MCU "STM32H563")
+set(MCU "STM32H503")
 set(MCPU                     "-mcpu=cortex-m33")
 set(MFPU                     "-mfpu=fpv5-sp-d16")
 set(MFLOAT_ABI               "-mfloat-abi=hard")
@@ -20,5 +20,5 @@ add_compile_definitions(USE_FULL_LL_DRIVER=TRUE)
 
 add_subdirectory(external)
 add_subdirectory(mcu_support)
-add_subdirectory(DemoNucleoH563)
+add_subdirectory(DemoNucleoH503)
 
