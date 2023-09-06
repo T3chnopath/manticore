@@ -1,4 +1,3 @@
-#include "string.h"
 #include "bsp_nucleo_h563.h"
 
 int main(void)
