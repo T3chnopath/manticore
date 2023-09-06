@@ -8,7 +8,7 @@ add_executable(Demo.elf
 )
 
 target_link_options(Demo.elf PRIVATE
-    -T ${CMAKE_CURRENT_SOURCE_DIR}/STM32H563xx_FLASH.ld
+    -T ${LINKERSRIPT}
 )
 
 target_include_directories(Demo.elf PUBLIC
