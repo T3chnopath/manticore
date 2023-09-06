@@ -36,9 +36,9 @@
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
-void SystemClock_Config(void);
-void MX_GPIO_Init(void);
+void BSP_Error_Handler(void);
+void BSP_SystemClock_Config(void);
+void BSP_GPIO_Init(void);
 
 /* USER CODE BEGIN EFP */
 

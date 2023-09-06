@@ -1,6 +1,6 @@
 #include "bsp_nucleo_h563.h"
 
-void SystemClock_Config(void)
+void BSP_SystemClock_Config(void)
 {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -35,7 +35,7 @@ void SystemClock_Config(void)
     
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     {
-        Error_Handler();
+        BSP_Error_Handler();
     }
 
     // Initializes the CPU, AHB and APB buses clocks
@@ -50,12 +50,12 @@ void SystemClock_Config(void)
 
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
     {
-      Error_Handler();
+      BSP_Error_Handler();
     }
 }
 
 
-void MX_GPIO_Init(void)
+void BSP_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -112,7 +112,7 @@ void MX_GPIO_Init(void)
     HAL_GPIO_Init(UCPD_FLT_GPIO_Port, &GPIO_InitStruct);
 }
 
-void Error_Handler(void)
+void BSP_Error_Handler(void)
 {
     __disable_irq();
     while (1)
