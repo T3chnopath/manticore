@@ -43,7 +43,8 @@ void my_thread_entry(ULONG initial_input)
 {
     while( true )
     {
-        HAL_Delay(1000);
+        tx_thread_sleep(500);
+        HAL_Delay(500);
         HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
     }
 
