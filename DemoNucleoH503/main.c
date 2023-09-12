@@ -1,6 +1,6 @@
 #include "bsp_nucleo_h503.h"
 #include "tx_api.h"
-#include "stdbool.h"
+#include <stdbool.h>
 
 #define THREAD_STACK_SIZE 1024
 

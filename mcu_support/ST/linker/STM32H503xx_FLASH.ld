@@ -56,7 +56,7 @@ SECTIONS
   {
      . = ALIGN(4);
      __RAM_segment_used_end__ = .;
-     . = . + 12K;
+     . = . + 16K;
      . = ALIGN(4);
    } >RAM_THREADX AT> RAM_THREADX
 
