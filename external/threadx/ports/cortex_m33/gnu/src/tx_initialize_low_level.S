@@ -24,8 +24,8 @@
 #include "tx_user.h"
 #endif
 
-SYSTEM_CLOCK        =     6000000
-SYSTICK_CYCLES      =     ((SYSTEM_CLOCK / 100) -1)
+SYSTEM_CLOCK        =     240000000
+SYSTICK_CYCLES      =     ((SYSTEM_CLOCK / 1000) -1)
 
 /* Setup the stack and heap areas.  */
 
@@ -99,7 +99,7 @@ _tx_initialize_low_level:
 
     /* Setup Vector Table Offset Register.  */
     MOV     r0, #0xE000E000                         // Build address of NVIC registers
-    LDR     r1, =_vectors                           // Pickup address of vector table
+    LDR     r1, =g_pfnVectors                           // Pickup address of vector table
     STR     r1, [r0, #0xD08]                        // Set vector table address
 
     /* Enable the cycle count register.  */
@@ -110,7 +110,7 @@ _tx_initialize_low_level:
 
     /* Set system stack pointer from vector value.  */
     LDR     r0, =_tx_thread_system_stack_ptr        // Build address of system stack pointer
-    LDR     r1, =_vectors                           // Pickup address of vector table
+    LDR     r1, =g_pfnVectors                        // Pickup address of vector table
     LDR     r1, [r1]                                // Pickup reset stack pointer
     STR     r1, [r0]                                // Save system stack pointer
 
@@ -171,28 +171,6 @@ __tx_IntHandler:
     BX      lr
 // }
 
-
-    .section .text
-    .balign 4
-    .syntax unified
-    .eabi_attribute Tag_ABI_align_preserved, 1
-    .global  SysTick_Handler
-    .thumb_func
-.type SysTick_Handler, function
-SysTick_Handler:
-// VOID TimerInterruptHandler (VOID)
-// {
-    PUSH    {r0,lr}     // Save LR (and dummy r0 to maintain stack alignment)
-#if (defined(TX_ENABLE_EXECUTION_CHANGE_NOTIFY) || defined(TX_EXECUTION_PROFILE_ENABLE))
-    BL      _tx_execution_isr_enter             // Call the ISR enter function
-#endif
-    BL      _tx_timer_interrupt
-#if (defined(TX_ENABLE_EXECUTION_CHANGE_NOTIFY) || defined(TX_EXECUTION_PROFILE_ENABLE))
-    BL      _tx_execution_isr_exit              // Call the ISR exit function
-#endif
-    POP     {r0,lr}
-    BX      lr
-// }
 
 
     .section .text
