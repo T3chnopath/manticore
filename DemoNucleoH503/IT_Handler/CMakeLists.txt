@@ -9,3 +9,5 @@ target_link_libraries(IT_Handler HAL threadx)
 target_include_directories(IT_Handler PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/
 )
+
+set(IT_HANDLER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/stm32h5xx_it.c)
