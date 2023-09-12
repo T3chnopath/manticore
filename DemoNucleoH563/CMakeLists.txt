@@ -3,8 +3,8 @@ add_subdirectory(BSP)
 
 add_executable(Demo.elf
     main.c
-    ${STARTUP}
-    ${CMAKE_CURRENT_SOURCE_DIR}/IT_Handler/stm32h5xx_it.c
+    ${STARTUP_SOURCE}
+    ${IT_HANDLER_SOURCE}
 )
 
 target_link_options(Demo.elf PRIVATE
@@ -19,5 +19,6 @@ target_link_libraries(Demo.elf
     threadx
     CMSIS
     HAL
+    IT_Handler
     BSP
 )
