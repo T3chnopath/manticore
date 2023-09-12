@@ -94,6 +94,7 @@
 #include "tx_user.h"
 #endif /* TX_INCLUDE_USER_DEFINE_FILE */
 
+#define TX_TIMER_TICKS_PER_SECOND (1000UL)
 /* Define compiler library include files.  */
 
 #include <stdlib.h>
