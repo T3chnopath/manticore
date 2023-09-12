@@ -9,7 +9,7 @@ set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-if(NOT DEFINED ${MCU})
+if(NOT (MCU STREQUAL "STM32H503" OR MCU STREQUAL "STM32H563") )
     message(FATAL_ERROR "No MCU specified! Use ./scripts/build.sh <STM32H503 | STM32H563>")
 endif()
 
