@@ -45,21 +45,12 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 600K
-  RAM_THREADX    (xrw)    : ORIGIN = 0x20096000,   LENGTH = 40K
   FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 2048K
 }
 
 /* Sections */
 SECTIONS
 {
-  ._threadx_heap :
-  {
-     . = ALIGN(4);
-     __RAM_segment_used_end__ = .;
-     . = . + 40K;
-     . = ALIGN(4);
-   } >RAM_THREADX AT> RAM_THREADX
-
   /* The startup code into "FLASH" Rom type memory */
   .isr_vector :
   {
@@ -181,6 +172,8 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
   } >RAM
+
+  __RAM_segment_used_end__ = .;
 
   /* Remove information from the compiler libraries */
   /DISCARD/ :
