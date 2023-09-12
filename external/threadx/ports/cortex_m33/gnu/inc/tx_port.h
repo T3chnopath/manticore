@@ -84,6 +84,7 @@
 #ifndef TX_PORT_H
 #define TX_PORT_H
 
+#define TX_SINGLE_MODE_NON_SECURE
 /* Determine if the optional ThreadX user define file should be used.  */
 #ifdef TX_INCLUDE_USER_DEFINE_FILE
 
