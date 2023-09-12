@@ -9,7 +9,10 @@ set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-set(MCU "STM32H503")
+if(NOT DEFINED ${MCU})
+    message(FATAL_ERROR "No MCU specified! Use ./scripts/build.sh <STM32H503 | STM32H563>")
+endif()
+
 set(MCPU                     "-mcpu=cortex-m33")
 set(MFPU                     "-mfpu=fpv5-sp-d16")
 set(MFLOAT_ABI               "-mfloat-abi=hard")
