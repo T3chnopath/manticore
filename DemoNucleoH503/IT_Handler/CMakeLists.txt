@@ -3,7 +3,7 @@ add_library(IT_Handler
     stm32h5xx_it.c
 )
 
-target_link_libraries(IT_Handler HAL)
+target_link_libraries(IT_Handler HAL threadx)
 
 # Include header
 target_include_directories(IT_Handler PUBLIC
