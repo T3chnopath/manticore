@@ -9,7 +9,13 @@ set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-if(NOT (MCU STREQUAL "STM32H503" OR MCU STREQUAL "STM32H563") )
+if(MCU STREQUAL "STM32H503")
+    message(STATUS "MCU selected: ${MCU}")
+    set(DEMO "DemoNucleoH503")
+elseif(MCU STREQUAL "STM32H563")
+    message(STATUS "MCU selected: ${MCU}")
+    set(DEMO "DemoNucleoH563")
+else()
     message(FATAL_ERROR "No MCU specified! Use ./scripts/build.sh <STM32H503 | STM32H563>")
 endif()
 
@@ -23,5 +29,5 @@ add_compile_definitions(USE_FULL_LL_DRIVER=TRUE)
 
 add_subdirectory(external)
 add_subdirectory(mcu_support)
-add_subdirectory(DemoNucleoH503)
+add_subdirectory(${DEMO})
 
