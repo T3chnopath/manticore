@@ -9,6 +9,7 @@ Users must install the most recent versions of CMake and gcc-arm locally.
 ```
 sudo apt install cmake
 sudo apt install gcc-arm-none-eabi
+sudp apt-get install g++
 ```
 
 # Flashing and Debugging
