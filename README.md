@@ -35,3 +35,7 @@ Run the build script in the project root:
 
 ``` ./scripts/build.sh < STM32H503 | STM32H563 > ```
 
+A `Demo.elf` file will be built for the MCU that was selected. 
+
+# Flashing
+A Python build script to automate flashing is still in progress. In the meantime, flashing must be done manually with the `JLinkExe` utility. The `Demo.elf` file must be flashed at offset `0x08000000`.
