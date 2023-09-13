@@ -11,6 +11,8 @@ sudo apt install gcc-arm-none-eabi
 The Modular Vehicle Electronics System leverages the Segger suite of utilities.
 Users must install Segger JLinkCommander for flashing, and Segger Ozone for debugging. Both are found [here](https://www.segger.com/downloads/jlink/).
 
+Run JLinkCommander with `JLinkExe`. A full list of commands for JLinkCommander can be found [here](https://wiki.segger.com/J-Link_Commander).
+
 # Building 
 ### Manually 
 ```
