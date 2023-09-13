@@ -3,7 +3,7 @@
 This repo will link the necessary linkerscript, startup ASM, HAL, and ThreadX libraries to build for the STM32H503 and STM32H563. To use the platform, it must be subtreed or submoduled in another repo.
 
 # Required Packages
-Nix Package managment still needs to be implemented. In the meantime, users must install the most recent versions of CMake and gcc-arm locally.
+Users must install the most recent versions of CMake and gcc-arm locally.
 
 **In Terminal**:
 ```
@@ -38,4 +38,4 @@ Run the build script in the project root:
 A `Demo.elf` file will be built for the MCU that was selected. 
 
 # Flashing
-A Python build script to automate flashing is still in progress. In the meantime, flashing must be done manually with the `JLinkExe` utility. The `Demo.elf` file must be flashed at offset `0x08000000`.
+Flashing must be done manually with the `JLinkExe` utility. The `Demo.elf` file must be flashed at offset `0x08000000`.
