@@ -16,9 +16,7 @@ target_include_directories(Demo.elf PUBLIC
 )
 
 target_link_libraries(Demo.elf
-    threadx
-    CMSIS
-    HAL
+    MCU_Support
     IT_Handler
     BSP
 )
