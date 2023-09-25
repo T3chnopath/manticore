@@ -29,5 +29,8 @@ add_compile_definitions(USE_FULL_LL_DRIVER=TRUE)
 
 add_subdirectory(external)
 add_subdirectory(mcu_support)
-add_subdirectory(${DEMO})
+
+if(COMPILE_DEMO)
+    add_subdirectory(${DEMO})
+endif()
 
