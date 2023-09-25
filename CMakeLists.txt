@@ -33,7 +33,7 @@ add_subdirectory(external)
 add_subdirectory(mcu_support)
 add_subdirectory(common)
 
-if(COMPILE_DEMO)
+if(NOT SUBTREE)
     add_subdirectory(${DEMO})
 endif()
 
