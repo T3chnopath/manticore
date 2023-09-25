@@ -15,7 +15,7 @@ if(BUILD_TARGET STREQUAL "DemoNucleoH503")
     set(MCU "STM32H503")
 elseif(BUILD_TARGET STREQUAL "DemoNucleoH563")
     set(MCU "STM32H563")
-else()
+elseif(NOT SUBTREE)
    message(FATAL_ERROR "No target specified! Use ./scripts/build.sh <DemoNucleoH503 | DemoNucleoH563>")
 endif()
 
