@@ -1,13 +1,15 @@
-cmake_minimum_required(VERSION 3.22)
-project(MantiCore)
+if(NOT SUBTREE)
+    cmake_minimum_required(VERSION 3.22)
+    project(MantiCore)
 
-enable_language(C ASM)
-set(CMAKE_SYSTEM_PROCESSOR arm)
-set(CMAKE_C_COMPILER arm-none-eabi-gcc)
-set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
+    enable_language(C ASM)
+    set(CMAKE_SYSTEM_PROCESSOR arm)
+    set(CMAKE_C_COMPILER arm-none-eabi-gcc)
+    set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 
-set(CMAKE_C_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+    set(CMAKE_C_EXTENSIONS OFF)
+    set(CMAKE_C_STANDARD_REQUIRED ON)
+endif()
 
 if(MCU STREQUAL "STM32H503")
     message(STATUS "MCU selected: ${MCU}")
