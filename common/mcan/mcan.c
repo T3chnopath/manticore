@@ -168,6 +168,9 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
     uint32_t uIdentifier = 0;
     _MCAN_Conv_ID_To_Uint32(mcanTxMessage->mcanID, &uIdentifier);
 
+    // Set timestamp
+    mcanTxMessage->mcanID->MCAN_TIME_STAMP = MCAN_TimeStamp;
+
     // Format header: assume 64 byte CANFD with flexible data rate
     FDCAN_TxHeaderTypeDef TxHeader = {
         .Identifier = uIdentifier,
