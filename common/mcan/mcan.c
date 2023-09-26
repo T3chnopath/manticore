@@ -384,6 +384,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
         // Interpret ID for MCAN struct from uint32 identifier
         _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, _mcanRxMessage->mcanID);
+
+        // Update time stamp to be time of reception
+        _mcanRxMessage->mcanID->MCAN_TIME_STAMP = MCAN_TimeStamp;
+
         MCAN_Rx_Handler();
     }
 }
