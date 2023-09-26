@@ -60,5 +60,6 @@ __weak bool MCAN_RX_Handler( void ); // Called by ISR
 bool MCAN_TX( sMCAN_Message* mcanTxMessage );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
+void MCAN_IncTimeStamp( void );
 
 #endif /* __MCAN_H */

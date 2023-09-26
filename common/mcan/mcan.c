@@ -1,11 +1,8 @@
 #include "stm32h5xx_hal.h"
 #include "mcan.h"
 
-/********* Global Variables ********/
-volatile uint16_t MCAN_TimeStamp = 0;
-
-
-/********** Data Structures ********/
+/********** Static Variables and Data Structures ********/
+static uint16_t MCAN_TimeStamp = 0;
 static FDCAN_HandleTypeDef *_hfdcan;
 static sMCAN_Message* _mcanRxMessage;
 
@@ -347,9 +344,38 @@ FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
     return _hfdcan;
 }
 
+/*********************************************************************************
+    Name: MCAN_IncTimeStamp
+    
+    Description:
+        Called in HAL_GetTick every millisecond. Increments the MCAN_TimeStamp
+        every 1000 milliseconds.
+
+    Arguments:
+        None
+
+    Returns:
+        None
+***********************************************************************************/
+void MCAN_IncTimeStamp( void )
+{
+    static uint16_t ms;
+
+    if ( ms == 1000 )
+    {   
+        // Increment timestamp if less than UINT16_MAX, otherwise reset
+        MCAN_TimeStamp = ( MCAN_TimeStamp < UINT16_MAX) ? MCAN_TimeStamp + 1 : 0;
+        ms = 0;
+    }
+    else
+    {
+        ms++;
+    }
+}
 
 
-/***************************** External Callback Redefinitions *****************************/
+
+/***************************** External Overrides *****************************/
 
 /*********************************************************************************
     Name: HAL_FDCAN_RxFifo0Callback
