@@ -1,15 +1,13 @@
 #include "stm32h5xx_hal.h"
 #include "mcan.h"
 
+/********* Global Variables ********/
 volatile uint16_t MCAN_TimeStamp = 0;
 
+
+/********** Data Structures ********/
 static FDCAN_HandleTypeDef *_hfdcan;
 static sMCAN_Message* _mcanRxMessage;
-
-static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
-static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice);
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
-static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 
 typedef enum {
     mMCAN_MessageStamp = ( 0x7FFF << 0  ), 
@@ -19,10 +17,33 @@ typedef enum {
     mMCAN_Type         = (   0x07 << 24 ),
 } MCAN_ID_MASK;
 
-/*
-    Static Function Declarations
-*/
-bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
+
+/********** Static Function Declarations ********/
+static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
+static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice);
+static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
+static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
+
+
+
+/***************************** Static Function Definitions *****************************/
+
+/************************************************************
+    Name: _MCAN_ConfigInterface
+    
+    Description:
+        Configures the FDCAN interface based on input. Assumes
+        all modules use the same clockspeed, resulting in the
+        same time quanta config. Assumes FD in BRS mode.
+
+    Arguments:
+        eInterface = FDCAN interface that is selected ( 1 or 2 )
+
+    Returns:
+        True  = succesful config init
+        False = config failure 
+*************************************************************/
+static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
 {
     FDCAN_GlobalTypeDef* FDCAN_Instance;
 
@@ -76,7 +97,23 @@ bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
     return true;
 }
 
-bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
+/********************************************************************
+    Name: _MCAN_ConfigFilter
+    
+    Description:
+        Filters CAN messages based on the current device.
+        Does not consider priority, or messages destined
+        for other devices. Exception is the ALL_DEVICES
+        selection. Assumes Extended CAN2.0B style IDs.
+
+    Arguments:
+        currentDevice = current module expecting reception
+
+    Returns:
+        True  = succesful config init
+        False = config failure 
+*********************************************************************/
+static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
 {
     FDCAN_FilterTypeDef sFilterConfig =
     {
@@ -96,16 +133,43 @@ bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
     return true; 
 }
 
-inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
+/*********************************************************************************
+    Name: _MCAN_Conv_Uint32_To_ID
+    
+    Description:
+        Helper to convert uint32 style HAL identifiers to MCAN identifiers.
+
+    Arguments:
+        uIdentifier = identifier from HAL FDCAN API
+        mcanID      = pointer to an MCAN style ID where conversion is stored
+
+    Returns:
+        None
+***********************************************************************************/
+static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
     mcanID->MCAN_TIME_STAMP = ( uIdentifier & mMCAN_MessageStamp );
-    mcanID->MCAN_PRIORITY  = ( uIdentifier & mMCAN_Priority );
-    mcanID->MCAN_RX_Device = ( uIdentifier & mMCAN_RxDevice );
-    mcanID->MCAN_TX_Device = ( uIdentifier & mMCAN_TxDevice );
-    mcanID->MCAN_TYPE      = ( uIdentifier & mMCAN_Type );
+    mcanID->MCAN_PRIORITY   = ( uIdentifier & mMCAN_Priority );
+    mcanID->MCAN_RX_Device  = ( uIdentifier & mMCAN_RxDevice );
+    mcanID->MCAN_TX_Device  = ( uIdentifier & mMCAN_TxDevice );
+    mcanID->MCAN_TYPE       = ( uIdentifier & mMCAN_Type );
 }
 
-inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
+/*********************************************************************************
+    Name: _MCAN_Conv_ID_To_Uint32
+    
+    Description:
+        Helper to convert MCAN identifiers to uint32 style HAL identifiers,
+
+    Arguments:
+        mcanID      = pointer to an MCAN style ID, 
+        uIdentifier = pointer to identifier from HAL FDCAN API where
+                      conversion is stored
+        
+    Returns:
+        None
+***********************************************************************************/
+static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
     *uIdentifier = (*uIdentifier & mMCAN_MessageStamp) | mcanID->MCAN_TIME_STAMP;
@@ -117,9 +181,22 @@ inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 
 
 
-/*
-    Public Function Declarations
-*/
+/***************************** Public Function Definitions *****************************/
+
+/*********************************************************************************
+    Name: MCAN_PeriphConfig
+    
+    Description:
+        Configure FDCAN interface and filtering.
+
+    Arguments:
+        eInterface    = FDCAN interface that is selected ( 1 or 2 )
+        currentDevice = current module expecting reception
+
+    Returns:
+        True  = succesful interface and filter configuration
+        False = failed interface or filter configuration 
+***********************************************************************************/
 bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
 {
   
@@ -136,11 +213,37 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
    return true;
 }
 
+/*****************************************************************
+    Name: MCAN_RegisterRx
+
+    Description:
+        Register an MCAN Message struct pointer as a buffer for
+        received messages. 
+
+    Arguments:
+        mcanRxMessage = pointer to an sMCAN_Message provided
+                        by the caller
+    Returns:
+        None
+******************************************************************/
 void MCAN_RegisterRX( sMCAN_Message* mcanRxMessage )
 {
     _mcanRxMessage = mcanRxMessage;
 } 
 
+/*********************************************************************************
+    Name: MCAN_StartRX_IT
+    
+    Description:
+        Start the FDCAN interface in interrupt mode, given current configs.
+
+    Arguments:
+        None
+
+    Returns:
+        True  = succesful activation of peripheral and interrupt notifs
+        False = failure to activate peripheral or interrupt notifs
+***********************************************************************************/
 bool MCAN_StartRX_IT( void )
 {
     if( HAL_FDCAN_Start( _hfdcan ) != HAL_OK)
@@ -156,12 +259,43 @@ bool MCAN_StartRX_IT( void )
     return true;
 }
 
-// Rx Handler to be overwritten by the caller
+/*********************************************************************************
+    Name: MCAN_Rx_Handler
+    
+    Description:
+        Weak function to be overriden by a module, that is called in the FDCAN
+        ISR Callback.
+
+        Module has full responsibility for RX processing of the buffer provided
+        during registration.
+
+    Arguments:
+        None
+
+    Returns:
+        True  = up to the caller
+        False = up to the caller
+***********************************************************************************/
 __weak bool MCAN_Rx_Handler()
 {
     return true;
 }
 
+/*********************************************************************************
+    Name: MCAN_TX
+    
+    Description:
+        Transmit an MCAN message, given an MCAN message struct. Struct timestamp
+        is always overwritten.
+
+    Arguments:
+        mcanTxMessage = pointer to an MCAN message struct which specifies message
+                        data and MCAN ID configs. 
+
+    Returns:
+        True  = successful transmission of message
+        False = failed tranmission of message
+***********************************************************************************/
 bool MCAN_TX( sMCAN_Message* mcanTxMessage )
 {
     // Interpret 32 bit idenfitier from MCAN message struct ID
@@ -193,12 +327,43 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
     return true;
 }
 
+/*********************************************************************************
+    Name: MCAN_GetFDCAN_Handler 
+    
+    Description:
+        Simple getter which returns the applicable FDCAN_HandleTypeDef of
+        the selected interface.
+
+        Used solely for context in the ISR processing.
+
+    Arguments:
+        None
+
+    Returns:
+        A pointer to the FDCAN_HandleTypeDef.
+***********************************************************************************/
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
 {
     return _hfdcan;
 }
 
-// Weak callback overriden for MCAN
+
+
+/***************************** External Callback Redefinitions *****************************/
+
+/*********************************************************************************
+    Name: HAL_FDCAN_RxFifo0Callback
+    
+    Description:
+        HAL Callback that is overriden to update the register MCAN Rx buf.
+
+    Arguments:
+        hfdcan     = pointer to an FDCAN_HandleTypeDef, handled by ISR context
+        RxFifoOITs = used for interrupt configuration, handled by ISR context
+    
+    Returns:
+        None
+***********************************************************************************/
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
     // Allocate Rx Header to be populated with message data
