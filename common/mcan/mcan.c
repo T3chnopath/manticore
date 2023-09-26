@@ -1,26 +1,23 @@
 #include "stm32h5xx_hal.h"
 #include "mcan.h"
 
-#if !defined(FDCAN1) || !defined(FDCAN2)
-    #error "No CAN Peripheral is defined!"
-#endif
-
-typedef enum {
-    mMCAN_MessageStamp = ( 0x7FFF << 0  ), 
-    mMCAN_Priority     = (   0x07 << 15 ), 
-    mMCAN_RxDevice     = (   0x0F << 18 ),
-    mMCAN_TxDevice     = (   0x0F << 22 ),
-    mMCAN_Type         = (   0x07 << 26 ),
-} MCAN_ID_MASK;
+volatile uint16_t MCAN_TimeStamp = 0;
 
 static FDCAN_HandleTypeDef *_hfdcan;
 static sMCAN_Message* _mcanRxMessage;
 
 static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
-static bool _MCAN_ConfigFilter( uint32_t uFilter);
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdenfitier );
+static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice);
+static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 
+typedef enum {
+    mMCAN_MessageStamp = ( 0x7FFF << 0  ), 
+    mMCAN_Priority     = (   0x07 << 15 ), 
+    mMCAN_RxDevice     = (   0x0F << 16 ),
+    mMCAN_TxDevice     = (   0x0F << 20 ),
+    mMCAN_Type         = (   0x07 << 24 ),
+} MCAN_ID_MASK;
 
 /*
     Static Function Declarations
@@ -31,7 +28,7 @@ bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
 
     switch( eInterface )
     {
-        #ifdef FDCAN1
+        #ifdef FDCAN1 
         case FDCAN1_PERIPH:
             FDCAN_Instance = FDCAN1;
             break;
@@ -41,6 +38,10 @@ bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
         case FDCAN2_PERIPH:
             FDCAN_Instance = FDCAN2;
             break;
+        #endif
+
+        #if ( !defined(FDCAN1) && !defined(FDCAN2) )
+            #error "No FDCAN peripheral is defined!"
         #endif
 
         default:
@@ -75,7 +76,7 @@ bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
     return true;
 }
 
-bool _MCAN_ConfigFilter( uint32_t uFilter)
+bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
 {
     FDCAN_FilterTypeDef sFilterConfig =
     {
@@ -83,8 +84,8 @@ bool _MCAN_ConfigFilter( uint32_t uFilter)
         .FilterIndex   = 0,
         .FilterType    = FDCAN_FILTER_MASK,
         .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID1     = 0x01,  // ID to look for
-        .FilterID2     = 0x01,  // BitMask
+        .FilterID1     = currentDevice || ALL_DEVICES,  // Filter will trigger if intended for current or all devices
+        .FilterID2     = mMCAN_RxDevice,                // Mask receive device
     };
 
     if ( HAL_FDCAN_ConfigFilter(_hfdcan, &sFilterConfig) != HAL_OK )
@@ -97,7 +98,7 @@ bool _MCAN_ConfigFilter( uint32_t uFilter)
 
 inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
-    mcanID->MCAN_MES_STAMP = ( uIdentifier & mMCAN_MessageStamp );
+    mcanID->MCAN_TIME_STAMP = ( uIdentifier & mMCAN_MessageStamp );
     mcanID->MCAN_PRIORITY  = ( uIdentifier & mMCAN_Priority );
     mcanID->MCAN_RX_Device = ( uIdentifier & mMCAN_RxDevice );
     mcanID->MCAN_TX_Device = ( uIdentifier & mMCAN_TxDevice );
@@ -107,7 +108,7 @@ inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
-    *uIdentifier = (*uIdentifier & mMCAN_MessageStamp) | mcanID->MCAN_MES_STAMP;
+    *uIdentifier = (*uIdentifier & mMCAN_MessageStamp) | mcanID->MCAN_TIME_STAMP;
     *uIdentifier = (*uIdentifier & mMCAN_Priority    ) | mcanID->MCAN_PRIORITY;
     *uIdentifier = (*uIdentifier & mMCAN_RxDevice    ) | mcanID->MCAN_RX_Device;
     *uIdentifier = (*uIdentifier & mMCAN_TxDevice    ) | mcanID->MCAN_TX_Device;
@@ -119,7 +120,7 @@ inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 /*
     Public Function Declarations
 */
-bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, uint32_t uFilter )
+bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
 {
   
     if ( !_MCAN_ConfigInterface( eInterface ) )
@@ -127,7 +128,7 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, uint32_t uFilter )
         return false;
     }
 
-    if ( !_MCAN_ConfigFilter( uFilter ) )
+    if ( !_MCAN_ConfigFilter( currentDevice ) )
     {
         return false;
     }
@@ -165,7 +166,7 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
 {
     // Interpret 32 bit idenfitier from MCAN message struct ID
     uint32_t uIdentifier = 0;
-    _MCAN_Conv_ID_Uint32(mcanTxMessage->mcanID, &uIdentifier);
+    _MCAN_Conv_ID_To_Uint32(mcanTxMessage->mcanID, &uIdentifier);
 
     // Format header: assume 64 byte CANFD with flexible data rate
     FDCAN_TxHeaderTypeDef TxHeader = {
@@ -174,7 +175,7 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
         .TxFrameType = FDCAN_DATA_FRAME,
         .DataLength = FDCAN_DLC_BYTES_64,
         .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
-        .BitRateSwitch = FDCAN_BRS_ON,
+        .BitRateSwitch = FDCAN_BRS_OFF,
         .FDFormat = FDCAN_FD_CAN,
         .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
         .MessageMarker = 0,
@@ -189,6 +190,11 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
     return true;
 }
 
+FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
+{
+    return _hfdcan;
+}
+
 // Weak callback overriden for MCAN
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
@@ -196,13 +202,13 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     FDCAN_RxHeaderTypeDef _RxHeader = { 0 };
     if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
     {
-        /* Retreive Rx messages from RX FIFO0 */
+        // Populate header and MCAN data 
         if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_RxHeader, _mcanRxMessage->mcanData) != HAL_OK)
         {
         /* Reception Error */
         }
 
-        // Renable interrupts
+        // Enable interrupts
         if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
         {
         /* Notification Error */
