@@ -67,6 +67,7 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
             break;
     }
 
+    // Configure for 1MHz Nominal, 2MH BRS
     _hfdcan->Instance = FDCAN_Instance;
     _hfdcan->Init.ClockDivider = FDCAN_CLOCK_DIV1;
     _hfdcan->Init.FrameFormat = FDCAN_FRAME_FD_BRS;
@@ -309,7 +310,7 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
         .TxFrameType = FDCAN_DATA_FRAME,
         .DataLength = FDCAN_DLC_BYTES_64,
         .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
-        .BitRateSwitch = FDCAN_BRS_OFF,
+        .BitRateSwitch = FDCAN_BRS_ON,
         .FDFormat = FDCAN_FD_CAN,
         .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
         .MessageMarker = 0,
