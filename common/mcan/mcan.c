@@ -72,7 +72,7 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
     _hfdcan.Instance = FDCAN_Instance;
     _hfdcan.Init.ClockDivider = FDCAN_CLOCK_DIV1;
     _hfdcan.Init.FrameFormat = FDCAN_FRAME_FD_BRS;
-    _hfdcan.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+    _hfdcan.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
     _hfdcan.Init.AutoRetransmission = ENABLE;
     _hfdcan.Init.TransmitPause = DISABLE;
     _hfdcan.Init.ProtocolException = DISABLE;

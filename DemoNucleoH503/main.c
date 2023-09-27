@@ -56,18 +56,36 @@ void tx_application_define(void *first_unused_memory)
 
 void my_thread_entry(ULONG initial_input)
 {
+
+    sMCAN_ID mcanTxID = {
+        .MCAN_PRIORITY = MCAN_DEBUG,
+        .MCAN_RX_Device = ALL_DEVICES,
+        .MCAN_TX_Device = ALL_DEVICES,
+        .MCAN_TIME_STAMP = 0,
+        .MCAN_TYPE = LOG,
+    };
+
+    uint8_t mcanTxData[64] = { 0 };
+
+    sMCAN_Message mcanTxMessage = {
+        .mcanID = &mcanTxID,
+        .mcanData = mcanTxData,
+    };
+
    while( true )
     {
         tx_thread_sleep(500);
-        HAL_Delay(500);
         HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
+
+        MCAN_TX(&mcanTxMessage);
     }
 
     
 
 }
 
-bool MCAN_RX_Handler( void )
+bool MCAN_Rx_Handler( void )
 {
+    HAL_Delay(500);
     return false;
 }
