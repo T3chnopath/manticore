@@ -69,21 +69,21 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
 
     _hfdcan->Instance = FDCAN_Instance;
     _hfdcan->Init.ClockDivider = FDCAN_CLOCK_DIV1;
-    _hfdcan->Init.FrameFormat = FDCAN_FRAME_FD_NO_BRS;
+    _hfdcan->Init.FrameFormat = FDCAN_FRAME_FD_BRS;
     _hfdcan->Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
     _hfdcan->Init.AutoRetransmission = ENABLE;
     _hfdcan->Init.TransmitPause = DISABLE;
     _hfdcan->Init.ProtocolException = DISABLE;
     _hfdcan->Init.NominalPrescaler = 1;
-    _hfdcan->Init.NominalSyncJumpWidth = 13;
-    _hfdcan->Init.NominalTimeSeg1 = 86;
-    _hfdcan->Init.NominalTimeSeg2 = 13;
-    _hfdcan->Init.DataPrescaler = 25;
-    _hfdcan->Init.DataSyncJumpWidth = 1;
-    _hfdcan->Init.DataTimeSeg1 = 2;
-    _hfdcan->Init.DataTimeSeg2 = 1;
+    _hfdcan->Init.NominalSyncJumpWidth = 2;
+    _hfdcan->Init.NominalTimeSeg1 = 117;
+    _hfdcan->Init.NominalTimeSeg2 = 2;
+    _hfdcan->Init.DataPrescaler = 1;
+    _hfdcan->Init.DataSyncJumpWidth = 29;
+    _hfdcan->Init.DataTimeSeg1 = 30;
+    _hfdcan->Init.DataTimeSeg2 = 29;
     _hfdcan->Init.StdFiltersNbr = 0;
-    _hfdcan->Init.ExtFiltersNbr = 0;
+    _hfdcan->Init.ExtFiltersNbr = 1;
     _hfdcan->Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
 
     if (HAL_FDCAN_Init(_hfdcan) != HAL_OK)

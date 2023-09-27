@@ -1,5 +1,6 @@
 #include "bsp_nucleo_h503.h"
 #include "tx_api.h"
+#include "mcan.h"
 #include <stdbool.h>
 
 #define THREAD_STACK_SIZE 1024
@@ -16,6 +17,9 @@ int main(void)
 
     /* Configure the system clock */
     BSP_SystemClock_Config();
+    
+    /* Initialize Peripheral Clocks */
+    BSP_PeriphClock_Config();
 
     /* Initialize all configured peripherals */
     BSP_GPIO_Init();
@@ -47,5 +51,7 @@ void my_thread_entry(ULONG initial_input)
         HAL_Delay(500);
         HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
     }
+
+    
 
 }

@@ -17,6 +17,7 @@
 // Public Functions
 void BSP_Error_Handler(void);
 void BSP_SystemClock_Config(void);
+void BSP_PeriphClock_Config(void);
 void BSP_GPIO_Init(void);
 
 #endif /* __MAIN_H */
