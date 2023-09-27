@@ -8,6 +8,12 @@
 uint8_t thread_stack[THREAD_STACK_SIZE];
 TX_THREAD thread_ptr;
 
+static sMCAN_ID mcanID = { 0 };
+static sMCAN_Message mcanMessage = {
+    .mcanID = &mcanID,
+    .mcanData = { 0 },
+};
+
 void my_thread_entry(ULONG ctx);
 
 int main(void)
@@ -23,6 +29,11 @@ int main(void)
 
     /* Initialize all configured peripherals */
     BSP_GPIO_Init();
+
+    MCAN_PeriphConfig( FDCAN1_PERIPH, MAIN_COMPUTE);
+    MCAN_RegisterRX_Buf(&mcanMessage);
+    MCAN_StartRX_IT();
+
 
     tx_kernel_enter();
    }
@@ -45,7 +56,7 @@ void tx_application_define(void *first_unused_memory)
 
 void my_thread_entry(ULONG initial_input)
 {
-    while( true )
+   while( true )
     {
         tx_thread_sleep(500);
         HAL_Delay(500);
@@ -54,4 +65,9 @@ void my_thread_entry(ULONG initial_input)
 
     
 
+}
+
+bool MCAN_RX_Handler( void )
+{
+    return false;
 }

@@ -44,7 +44,7 @@ typedef struct{
 } sMCAN_ID;
 
 typedef struct{
-    sMCAN_ID* mcanID;
+    sMCAN_ID *mcanID;
     uint8_t mcanData[64];
 } sMCAN_Message;
 

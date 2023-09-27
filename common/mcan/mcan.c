@@ -67,7 +67,7 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
             break;
     }
 
-    // Configure for 1MHz Nominal, 2MH BRS
+    // Configure for 1MHz Nominal, 2MHz BRS
     _hfdcan->Instance = FDCAN_Instance;
     _hfdcan->Init.ClockDivider = FDCAN_CLOCK_DIV1;
     _hfdcan->Init.FrameFormat = FDCAN_FRAME_FD_BRS;
@@ -224,7 +224,7 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
     Returns:
         None
 ******************************************************************/
-void MCAN_RegisterRX( sMCAN_Message* mcanRxMessage )
+void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage )
 {
     _mcanRxMessage = mcanRxMessage;
 } 
