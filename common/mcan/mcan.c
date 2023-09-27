@@ -1,9 +1,11 @@
 #include "stm32h5xx_hal.h"
+#include "stm32h503xx.h"
 #include "mcan.h"
 
 /********** Static Variables and Data Structures ********/
 static uint16_t MCAN_TimeStamp = 0;
-static FDCAN_HandleTypeDef *_hfdcan;
+static FDCAN_HandleTypeDef _hfdcan ;
+
 static sMCAN_Message* _mcanRxMessage;
 
 typedef enum {
@@ -43,7 +45,6 @@ static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcan
 static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
 {
     FDCAN_GlobalTypeDef* FDCAN_Instance;
-
     switch( eInterface )
     {
         #ifdef FDCAN1 
@@ -68,26 +69,26 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
     }
 
     // Configure for 1MHz Nominal, 2MHz BRS
-    _hfdcan->Instance = FDCAN_Instance;
-    _hfdcan->Init.ClockDivider = FDCAN_CLOCK_DIV1;
-    _hfdcan->Init.FrameFormat = FDCAN_FRAME_FD_BRS;
-    _hfdcan->Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
-    _hfdcan->Init.AutoRetransmission = ENABLE;
-    _hfdcan->Init.TransmitPause = DISABLE;
-    _hfdcan->Init.ProtocolException = DISABLE;
-    _hfdcan->Init.NominalPrescaler = 1;
-    _hfdcan->Init.NominalSyncJumpWidth = 2;
-    _hfdcan->Init.NominalTimeSeg1 = 117;
-    _hfdcan->Init.NominalTimeSeg2 = 2;
-    _hfdcan->Init.DataPrescaler = 1;
-    _hfdcan->Init.DataSyncJumpWidth = 29;
-    _hfdcan->Init.DataTimeSeg1 = 30;
-    _hfdcan->Init.DataTimeSeg2 = 29;
-    _hfdcan->Init.StdFiltersNbr = 0;
-    _hfdcan->Init.ExtFiltersNbr = 1;
-    _hfdcan->Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+    _hfdcan.Instance = FDCAN_Instance;
+    _hfdcan.Init.ClockDivider = FDCAN_CLOCK_DIV1;
+    _hfdcan.Init.FrameFormat = FDCAN_FRAME_FD_BRS;
+    _hfdcan.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
+    _hfdcan.Init.AutoRetransmission = ENABLE;
+    _hfdcan.Init.TransmitPause = DISABLE;
+    _hfdcan.Init.ProtocolException = DISABLE;
+    _hfdcan.Init.NominalPrescaler = 1;
+    _hfdcan.Init.NominalSyncJumpWidth = 2;
+    _hfdcan.Init.NominalTimeSeg1 = 117;
+    _hfdcan.Init.NominalTimeSeg2 = 2;
+    _hfdcan.Init.DataPrescaler = 1;
+    _hfdcan.Init.DataSyncJumpWidth = 29;
+    _hfdcan.Init.DataTimeSeg1 = 30;
+    _hfdcan.Init.DataTimeSeg2 = 29;
+    _hfdcan.Init.StdFiltersNbr = 0;
+    _hfdcan.Init.ExtFiltersNbr = 1;
+    _hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
 
-    if (HAL_FDCAN_Init(_hfdcan) != HAL_OK)
+    if (HAL_FDCAN_Init(&_hfdcan) != HAL_OK)
     {
         return false;
     }
@@ -123,7 +124,7 @@ static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
         .FilterID2     = mMCAN_RxDevice,                // Mask receive device
     };
 
-    if ( HAL_FDCAN_ConfigFilter(_hfdcan, &sFilterConfig) != HAL_OK )
+    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
     }
@@ -244,12 +245,12 @@ void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage )
 ***********************************************************************************/
 bool MCAN_StartRX_IT( void )
 {
-    if( HAL_FDCAN_Start( _hfdcan ) != HAL_OK)
+    if( HAL_FDCAN_Start( &_hfdcan ) != HAL_OK)
     {
         return false;
     }
 
-    if ( HAL_FDCAN_ActivateNotification( _hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
+    if ( HAL_FDCAN_ActivateNotification( &_hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
     {
         return false;
     }
@@ -317,7 +318,7 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
     };
 
     // Add frame to TX FIFO -> Transmit
-    if( HAL_FDCAN_AddMessageToTxFifoQ(_hfdcan, &TxHeader, mcanTxMessage->mcanData ) != HAL_OK )
+    if( HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan, &TxHeader, mcanTxMessage->mcanData ) != HAL_OK )
     {
         return false;
     }
@@ -342,7 +343,7 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
 ***********************************************************************************/
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
 {
-    return _hfdcan;
+    return &_hfdcan;
 }
 
 /*********************************************************************************
