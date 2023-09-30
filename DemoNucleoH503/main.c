@@ -1,24 +1,28 @@
+#include <stdbool.h>
+#include <string.h>
+
 #include "bsp_nucleo_h503.h"
 #include "tx_api.h"
 #include "mcan.h"
-#include <stdbool.h>
-#include <string.h>
 
 #define THREAD_STACK_SIZE 1024
 
 uint8_t thread_stack[THREAD_STACK_SIZE];
 TX_THREAD thread_ptr;
 
-static uint8_t mcanTxData[64] = {  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-                            11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-                            21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
-                            31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-                            41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-                            51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
-                            61, 62, 63 };
+static uint8_t mcanTxData[64] = 
+{
+    0,  1,  2,  3,  4,  5,  6,  7,
+    8,  9,  10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 20, 21, 22, 23,
+    24, 25, 26, 27, 28, 29, 30, 31,
+    32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47,
+    48, 49, 50, 51, 52, 53, 54, 55,
+    56, 57, 58, 59, 60, 61, 62, 63
+};
 
-
-static sMCAN_Message mcanRxMessage;
+static sMCAN_Message mcanRxMessage = { 0 };
 
 
 void my_thread_entry(ULONG ctx);
@@ -67,38 +71,20 @@ void my_thread_entry(ULONG initial_input)
    while( true )
     {
         HAL_Delay(1000);
-       
         MCAN_TX( MCAN_EMERGENCY, LOG, MAIN_COMPUTE, mcanTxData);
-
+        tx_thread_sleep(1000); 
+        MCAN_TX( MCAN_EMERGENCY, LOG, ALL_DEVICES, mcanTxData);
     }
 
 }
 
-bool MCAN_Rx_Handler( void )
+void MCAN_Rx_Handler( void )
 {
-    bool dataFlag = true; 
-    if ( mcanRxMessage.mcanID.MCAN_RX_Device == MAIN_COMPUTE)
+    if ( mcanRxMessage.mcanID.MCAN_RX_Device == MAIN_COMPUTE || mcanRxMessage.mcanID.MCAN_RX_Device == ALL_DEVICES )
     {
-        for ( uint8_t i = 0; (i < 64 && dataFlag); i++ )
-        {
-            if ( mcanRxMessage.mcanData[i] != i )
-            {
-                dataFlag = false;
-            }
-        }
-
-        if ( dataFlag )
+        if ( !memcmp(mcanRxMessage.mcanData, mcanTxData, 64 ) )
         {
             HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
-            return true;
         }
-
-        else
-        {
-            return false;
-        }
-            
     } 
-
-    return false;
 }

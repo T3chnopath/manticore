@@ -56,9 +56,8 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice );
 
 void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage ); 
 bool MCAN_StartRX_IT( void );
-__weak bool MCAN_RX_Handler( void ); // Called by ISR 
+__weak void MCAN_RX_Handler( void ); // Called by ISR 
 
-// bool MCAN_TX( sMCAN_Message* mcanTxMessage );
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );

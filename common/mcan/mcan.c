@@ -302,12 +302,11 @@ bool MCAN_StartRX_IT( void )
         None
 
     Returns:
-        True  = up to the caller
-        False = up to the caller
+        None
 ***********************************************************************************/
-__weak bool MCAN_Rx_Handler()
+__weak void MCAN_Rx_Handler()
 {
-    return true;
+    // NOP
 }
 
 /*********************************************************************************
