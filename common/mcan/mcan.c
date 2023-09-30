@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "stm32h5xx_hal.h"
 #include "stm32h503xx.h"
 #include "mcan.h"
@@ -5,6 +7,7 @@
 /********** Static Variables and Data Structures ********/
 static uint16_t MCAN_TimeStamp = 0;
 static const uint8_t MCAN_MAX_FILTERS = 2;
+static MCAN_DEV _currentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
 
 static sMCAN_Message* _mcanRxMessage;
@@ -28,7 +31,7 @@ typedef enum {
 
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
-static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice);
+static bool _MCAN_ConfigFilter( void );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 
@@ -121,37 +124,35 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
         True  = succesful config init
         False = config failure 
 *********************************************************************/
-static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
+static bool _MCAN_ConfigFilter( void )
 {
-    static uint8_t maskIndex = 0;
-
-    // If using this function for the first time, config global filters to reject incorrect IDs
-    if ( maskIndex == 0 )
+    FDCAN_FilterTypeDef sFilterConfig =
     {
-        if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
-        {
-            return false;
-        }
+        .IdType        = FDCAN_EXTENDED_ID,
+        .FilterType    = FDCAN_FILTER_MASK,
+        .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
+        .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
+    };
+
+    // Config global filters to reject incorrect IDs
+    if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
+{
+        return false;
     }
 
-    // Return false if mask filters are reached
-    if ( maskIndex == MCAN_MAX_FILTERS )
+    // Config first filter for current device 
+    sFilterConfig.FilterIndex = 0;
+    sFilterConfig.FilterID1 = _currentDevice << kMCAN_SHIFT_RxDevice;
+
+    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
     }
 
-    // Increment masked filters for new filters that are configured
-    FDCAN_FilterTypeDef sFilterConfig =
-    {
-        .IdType        = FDCAN_EXTENDED_ID,
-        .FilterIndex   = maskIndex++,
-        .FilterType    = FDCAN_FILTER_MASK,
-        .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID1     = currentDevice << kMCAN_SHIFT_RxDevice,  // Filter will trigger if intended for current or all devices
-        .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
-    };
+    // Config second filter for all devices: 
+    sFilterConfig.FilterIndex = 1;
+    sFilterConfig.FilterID1 = ALL_DEVICES << kMCAN_SHIFT_RxDevice;
 
-    // Configure filter
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
@@ -226,18 +227,14 @@ static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentif
 ***********************************************************************************/
 bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
 {
-  
+    _currentDevice = currentDevice;
+
     if ( !_MCAN_ConfigInterface( eInterface ) )
     {
         return false;
     }
 
-    if ( !_MCAN_ConfigFilter( currentDevice ) )
-    {
-        return false;
-    }
-
-   if ( !_MCAN_ConfigFilter( ALL_DEVICES ) )
+   if ( !_MCAN_ConfigFilter() )
     {
         return false;
     }
@@ -328,14 +325,19 @@ __weak bool MCAN_Rx_Handler()
         True  = successful transmission of message
         False = failed tranmission of message
 ***********************************************************************************/
-bool MCAN_TX( sMCAN_Message* mcanTxMessage )
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
+    sMCAN_ID mcanID = {
+            .MCAN_TYPE = mcanType, 
+            .MCAN_TX_Device = _currentDevice,
+            .MCAN_RX_Device = mcanRxDevice,
+            .MCAN_PRIORITY = mcanPri,
+            .MCAN_TIME_STAMP = MCAN_TimeStamp,
+    };
+    
     // Interpret 32 bit idenfitier from MCAN message struct ID
     static uint32_t uIdentifier;
-    _MCAN_Conv_ID_To_Uint32(mcanTxMessage->mcanID, &uIdentifier);
-
-    // Set timestamp
-    mcanTxMessage->mcanID->MCAN_TIME_STAMP = MCAN_TimeStamp;
+    _MCAN_Conv_ID_To_Uint32(&mcanID, &uIdentifier);
 
     // Format header: assume 64 byte CANFD with flexible data rate
     FDCAN_TxHeaderTypeDef TxHeader = {
@@ -351,13 +353,14 @@ bool MCAN_TX( sMCAN_Message* mcanTxMessage )
     };
 
     // Add frame to TX FIFO -> Transmit
-    if( HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan, &TxHeader, mcanTxMessage->mcanData ) != HAL_OK )
+    if( HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan, &TxHeader, mcanData ) != HAL_OK )
     {
         return false;
     }
 
     return true;
 }
+
 
 /*********************************************************************************
     Name: MCAN_GetFDCAN_Handler 
@@ -400,7 +403,7 @@ void MCAN_IncTimeStamp( void )
     {   
         // Increment timestamp if less than UINT16_MAX, otherwise reset
         MCAN_TimeStamp = ( MCAN_TimeStamp < UINT16_MAX) ? MCAN_TimeStamp + 1 : 0;
-        ms = 0;
+        ms = 0; 
     }
     else
     {
@@ -444,10 +447,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         }
 
         // Interpret ID for MCAN struct from uint32 identifier
-        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, _mcanRxMessage->mcanID);
+        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
 
         // Update time stamp to be time of reception
-        _mcanRxMessage->mcanID->MCAN_TIME_STAMP = MCAN_TimeStamp;
+        _mcanRxMessage->mcanID.MCAN_TIME_STAMP = MCAN_TimeStamp;
 
         MCAN_Rx_Handler();
     }

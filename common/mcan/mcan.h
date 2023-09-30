@@ -45,8 +45,8 @@ typedef struct{
 
 typedef struct
 {
-    sMCAN_ID *mcanID;
-    uint8_t *mcanData;
+    sMCAN_ID mcanID;
+    uint8_t mcanData[64];
 } sMCAN_Message;
 
 // Caller must provide bufferssS for Rx and Tx.
@@ -58,7 +58,8 @@ void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage );
 bool MCAN_StartRX_IT( void );
 __weak bool MCAN_RX_Handler( void ); // Called by ISR 
 
-bool MCAN_TX( sMCAN_Message* mcanTxMessage );
+// bool MCAN_TX( sMCAN_Message* mcanTxMessage );
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
 void MCAN_IncTimeStamp( void );
