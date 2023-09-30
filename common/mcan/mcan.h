@@ -43,12 +43,13 @@ typedef struct{
     uint32_t MCAN_TIME_STAMP;
 } sMCAN_ID;
 
-typedef struct{
+typedef struct
+{
     sMCAN_ID *mcanID;
-    uint8_t mcanData[64];
+    uint8_t *mcanData;
 } sMCAN_Message;
 
-// Caller must provide buffers for Rx and Tx.
+// Caller must provide bufferssS for Rx and Tx.
 
 // sMCAN_Message struct, provided by the caller, is populated with Rx content upon ISR firing
 bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice );

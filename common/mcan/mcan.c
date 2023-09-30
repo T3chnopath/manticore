@@ -9,11 +9,19 @@ static FDCAN_HandleTypeDef _hfdcan ;
 static sMCAN_Message* _mcanRxMessage;
 
 typedef enum {
-    mMCAN_MessageStamp = ( 0x7FFF << 0  ), 
-    mMCAN_Priority     = (   0x07 << 15 ), 
-    mMCAN_RxDevice     = (   0x0F << 16 ),
-    mMCAN_TxDevice     = (   0x0F << 20 ),
-    mMCAN_Type         = (   0x07 << 24 ),
+    kMCAN_SHIFT_MessageStamp = 0,
+    kMCAN_SHIFT_Priority = 16,
+    kMCAN_SHIFT_RxDevice = 18,
+    kMCAN_SHIFT_TxDevice = 22,
+    kMCAN_SHIFT_Type     = 26,
+} MCAN_ID_SHIFTS;
+
+typedef enum {
+    mMCAN_MessageStamp = 0xFFFF,
+    mMCAN_Priority     =   0x03 , 
+    mMCAN_RxDevice     =   0x0F ,
+    mMCAN_TxDevice     =   0x0F ,
+    mMCAN_Type         =   0x07 ,
 } MCAN_ID_MASK;
 
 
@@ -120,8 +128,8 @@ static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
         .FilterIndex   = 0,
         .FilterType    = FDCAN_FILTER_MASK,
         .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID1     = currentDevice || ALL_DEVICES,  // Filter will trigger if intended for current or all devices
-        .FilterID2     = mMCAN_RxDevice,                // Mask receive device
+        .FilterID1     = currentDevice,  // Filter will trigger if intended for current or all devices
+        .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
     };
 
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
@@ -147,11 +155,11 @@ static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
 ***********************************************************************************/
 static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
-    mcanID->MCAN_TIME_STAMP = ( uIdentifier & mMCAN_MessageStamp );
-    mcanID->MCAN_PRIORITY   = ( uIdentifier & mMCAN_Priority );
-    mcanID->MCAN_RX_Device  = ( uIdentifier & mMCAN_RxDevice );
-    mcanID->MCAN_TX_Device  = ( uIdentifier & mMCAN_TxDevice );
-    mcanID->MCAN_TYPE       = ( uIdentifier & mMCAN_Type );
+    mcanID->MCAN_TIME_STAMP |= (uIdentifier >> kMCAN_SHIFT_MessageStamp) & mMCAN_MessageStamp;
+    mcanID->MCAN_PRIORITY   |= (uIdentifier >> kMCAN_SHIFT_Priority) & mMCAN_Priority;
+    mcanID->MCAN_RX_Device  |= (uIdentifier >> kMCAN_SHIFT_RxDevice) & mMCAN_RxDevice;
+    mcanID->MCAN_TX_Device  |= (uIdentifier >> kMCAN_SHIFT_TxDevice) & mMCAN_TxDevice;
+    mcanID->MCAN_TYPE       |= (uIdentifier >> kMCAN_SHIFT_Type) & mMCAN_Type;
 }
 
 /*********************************************************************************
@@ -171,11 +179,11 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
-    *uIdentifier = (*uIdentifier & mMCAN_MessageStamp) | mcanID->MCAN_TIME_STAMP;
-    *uIdentifier = (*uIdentifier & mMCAN_Priority    ) | mcanID->MCAN_PRIORITY;
-    *uIdentifier = (*uIdentifier & mMCAN_RxDevice    ) | mcanID->MCAN_RX_Device;
-    *uIdentifier = (*uIdentifier & mMCAN_TxDevice    ) | mcanID->MCAN_TX_Device;
-    *uIdentifier = (*uIdentifier & mMCAN_Type        ) | mcanID->MCAN_TYPE;
+    *uIdentifier |= (mcanID->MCAN_TIME_STAMP << kMCAN_SHIFT_MessageStamp);
+    *uIdentifier |= (mcanID->MCAN_PRIORITY << kMCAN_SHIFT_Priority);
+    *uIdentifier |= (mcanID->MCAN_RX_Device << kMCAN_SHIFT_RxDevice);
+    *uIdentifier |= (mcanID->MCAN_TX_Device << kMCAN_SHIFT_TxDevice);
+    *uIdentifier |= (mcanID->MCAN_TYPE << kMCAN_SHIFT_Type);
 }
 
 
@@ -298,7 +306,7 @@ __weak bool MCAN_Rx_Handler()
 bool MCAN_TX( sMCAN_Message* mcanTxMessage )
 {
     // Interpret 32 bit idenfitier from MCAN message struct ID
-    uint32_t uIdentifier = 0;
+    static uint32_t uIdentifier;
     _MCAN_Conv_ID_To_Uint32(mcanTxMessage->mcanID, &uIdentifier);
 
     // Set timestamp
@@ -399,7 +407,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
     {
         // Populate header and MCAN data 
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_RxHeader, _mcanRxMessage->mcanData) != HAL_OK)
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_RxHeader, _mcanRxMessage->mcanData ) != HAL_OK)
         {
         /* Reception Error */
         }
