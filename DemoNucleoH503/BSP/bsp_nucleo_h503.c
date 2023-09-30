@@ -76,8 +76,8 @@ void BSP_PeriphClock_Config(void)
     __HAL_RCC_FDCAN_CLK_ENABLE();
 
     /* FDCAN1 interrupt Init */
-    // Must have interrupt 5 to work with systick
-    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 5, 0);
+    // Must have interrupt >1 to work with systick
+    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);    
 }
 

@@ -58,11 +58,10 @@ void tx_application_define(void *first_unused_memory)
                       0x1234, 
                       first_unused_memory, 
                       THREAD_STACK_SIZE, 
-                      4,
-                      4, 
+                      1,
                       1, 
+                      0, // Time slicing unused if all threads have unique priorities     
                       TX_AUTO_START);
-
 }
 
 void my_thread_entry(ULONG initial_input)
