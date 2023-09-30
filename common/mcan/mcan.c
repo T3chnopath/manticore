@@ -4,6 +4,7 @@
 
 /********** Static Variables and Data Structures ********/
 static uint16_t MCAN_TimeStamp = 0;
+static const uint8_t MCAN_MAX_FILTERS = 2;
 static FDCAN_HandleTypeDef _hfdcan ;
 
 static sMCAN_Message* _mcanRxMessage;
@@ -93,7 +94,7 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
     _hfdcan.Init.DataTimeSeg1 = 30;
     _hfdcan.Init.DataTimeSeg2 = 29;
     _hfdcan.Init.StdFiltersNbr = 0;
-    _hfdcan.Init.ExtFiltersNbr = 1;
+    _hfdcan.Init.ExtFiltersNbr = MCAN_MAX_FILTERS;
     _hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
 
     if (HAL_FDCAN_Init(&_hfdcan) != HAL_OK)
@@ -122,15 +123,27 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
 *********************************************************************/
 static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
 {
+    static uint8_t maskIndex = 0;
+
+    if ( maskIndex == MCAN_MAX_FILTERS )
+    {
+        return false;
+    }
+
     FDCAN_FilterTypeDef sFilterConfig =
     {
         .IdType        = FDCAN_EXTENDED_ID,
-        .FilterIndex   = 0,
+        .FilterIndex   = maskIndex++,
         .FilterType    = FDCAN_FILTER_MASK,
         .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID1     = currentDevice,  // Filter will trigger if intended for current or all devices
+        .FilterID1     = currentDevice << kMCAN_SHIFT_RxDevice,  // Filter will trigger if intended for current or all devices
         .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
     };
+
+    if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
+    {
+        return false;
+    }
 
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
@@ -213,6 +226,11 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
     }
 
     if ( !_MCAN_ConfigFilter( currentDevice ) )
+    {
+        return false;
+    }
+
+   if ( !_MCAN_ConfigFilter( ALL_DEVICES ) )
     {
         return false;
     }
