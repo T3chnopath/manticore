@@ -125,11 +125,22 @@ static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
 {
     static uint8_t maskIndex = 0;
 
+    // If using this function for the first time, config global filters to reject incorrect IDs
+    if ( maskIndex == 0 )
+    {
+        if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
+        {
+            return false;
+        }
+    }
+
+    // Return false if mask filters are reached
     if ( maskIndex == MCAN_MAX_FILTERS )
     {
         return false;
     }
 
+    // Increment masked filters for new filters that are configured
     FDCAN_FilterTypeDef sFilterConfig =
     {
         .IdType        = FDCAN_EXTENDED_ID,
@@ -140,11 +151,7 @@ static bool _MCAN_ConfigFilter( MCAN_DEV currentDevice)
         .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
     };
 
-    if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
-    {
-        return false;
-    }
-
+    // Configure filter
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
