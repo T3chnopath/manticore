@@ -80,22 +80,22 @@ static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
             break;
     }
 
-    // Configure for 1MHz Nominal, 2MHz BRS
+    // Configure for no BRS, 1MHz Nominal and 1MHz Data
     _hfdcan.Instance = FDCAN_Instance;
     _hfdcan.Init.ClockDivider = FDCAN_CLOCK_DIV1;
-    _hfdcan.Init.FrameFormat = FDCAN_FRAME_FD_BRS;
-    _hfdcan.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
+    _hfdcan.Init.FrameFormat = FDCAN_FRAME_FD_NO_BRS;
+    _hfdcan.Init.Mode = FDCAN_MODE_NORMAL;
     _hfdcan.Init.AutoRetransmission = ENABLE;
     _hfdcan.Init.TransmitPause = DISABLE;
     _hfdcan.Init.ProtocolException = DISABLE;
     _hfdcan.Init.NominalPrescaler = 1;
     _hfdcan.Init.NominalSyncJumpWidth = 2;
-    _hfdcan.Init.NominalTimeSeg1 = 117;
+    _hfdcan.Init.NominalTimeSeg1 = 29;
     _hfdcan.Init.NominalTimeSeg2 = 2;
     _hfdcan.Init.DataPrescaler = 1;
-    _hfdcan.Init.DataSyncJumpWidth = 29;
-    _hfdcan.Init.DataTimeSeg1 = 30;
-    _hfdcan.Init.DataTimeSeg2 = 29;
+    _hfdcan.Init.DataSyncJumpWidth = 15;
+    _hfdcan.Init.DataTimeSeg1 = 16;
+    _hfdcan.Init.DataTimeSeg2 = 15;
     _hfdcan.Init.StdFiltersNbr = 0;
     _hfdcan.Init.ExtFiltersNbr = MCAN_MAX_FILTERS;
     _hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
@@ -345,8 +345,8 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8
         .TxFrameType = FDCAN_DATA_FRAME,
         .DataLength = FDCAN_DLC_BYTES_64,
         .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
-        .BitRateSwitch = FDCAN_BRS_ON,
-        .FDFormat = FDCAN_FD_CAN,
+        .BitRateSwitch = FDCAN_BRS_OFF,
+        .FDFormat = FDCAN_CLASSIC_CAN,
         .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
         .MessageMarker = 0,
     };

@@ -10,20 +10,12 @@
 uint8_t thread_stack[THREAD_STACK_SIZE];
 TX_THREAD thread_ptr;
 
-static uint8_t mcanTxData[64] = 
-{
-    0,  1,  2,  3,  4,  5,  6,  7,
-    8,  9,  10, 11, 12, 13, 14, 15,
-    16, 17, 18, 19, 20, 21, 22, 23,
-    24, 25, 26, 27, 28, 29, 30, 31,
-    32, 33, 34, 35, 36, 37, 38, 39,
-    40, 41, 42, 43, 44, 45, 46, 47,
-    48, 49, 50, 51, 52, 53, 54, 55,
-    56, 57, 58, 59, 60, 61, 62, 63
-};
+static uint8_t mcanTxData[64];
 
 static sMCAN_Message mcanRxMessage = { 0 };
-
+static bool ToggleFlag = false;
+static bool TransmitFlag = false;
+static uint8_t count = 0;
 
 void my_thread_entry(ULONG ctx);
 
@@ -63,27 +55,53 @@ void tx_application_define(void *first_unused_memory)
                       0, // Time slicing unused if all threads have unique priorities     
                       TX_AUTO_START);
 }
-
 void my_thread_entry(ULONG initial_input)
 {
 
    while( true )
     {
-        HAL_Delay(1000);
-        MCAN_TX( MCAN_EMERGENCY, LOG, MAIN_COMPUTE, mcanTxData);
-        tx_thread_sleep(1000); 
-        MCAN_TX( MCAN_EMERGENCY, LOG, ALL_DEVICES, mcanTxData);
-    }
+        if ( ToggleFlag )
+        {
+            ToggleFlag = false;
+            mcanTxData[0] = count++;
+            MCAN_TX( MCAN_EMERGENCY, LOG, MAIN_COMPUTE, mcanTxData);
 
+            for (uint8_t i = 0; i < mcanRxMessage.mcanData[1]; i++)
+            {
+                HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_RESET);
+                tx_thread_sleep(100); 
+                HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_SET);
+                tx_thread_sleep(100);
+            }
+        } 
+
+        if ( TransmitFlag )
+        {
+            MCAN_TX( MCAN_EMERGENCY, LOG, MAIN_COMPUTE, mcanTxData);
+            tx_thread_sleep(1000);
+        }
+    }
 }
 
 void MCAN_Rx_Handler( void )
 {
     if ( mcanRxMessage.mcanID.MCAN_RX_Device == MAIN_COMPUTE || mcanRxMessage.mcanID.MCAN_RX_Device == ALL_DEVICES )
     {
-        if ( !memcmp(mcanRxMessage.mcanData, mcanTxData, 64 ) )
+        HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
+
+        if (mcanRxMessage.mcanData[0])
         {
-            HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
+            HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_SET);
         }
+
+        else if(!mcanRxMessage.mcanData[0])
+        {
+            HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_RESET);
+
+            if (mcanRxMessage.mcanData[1])
+            ToggleFlag = true;
+        }
+
+        TransmitFlag = mcanRxMessage.mcanData[2];
     } 
 }
