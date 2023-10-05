@@ -5,19 +5,19 @@
 #include "tx_api.h"
 #include "mcan.h"
 
-#define THREAD_STACK_SIZE 1024
 
-uint8_t thread_stack[THREAD_STACK_SIZE];
-TX_THREAD thread_ptr;
+// main thread
+#define MAIN_THREAD_STACK_SIZE 1024
+TX_THREAD stThreadMain;
+uint8_t auThreadStack[MAIN_THREAD_STACK_SIZE];
 
 static uint8_t mcanTxData[64];
-
 static sMCAN_Message mcanRxMessage = { 0 };
 static bool ToggleFlag = false;
 static bool TransmitFlag = false;
 static uint8_t count = 0;
 
-void my_thread_entry(ULONG ctx);
+void thread_main(ULONG ctx);
 
 int main(void)
 {
@@ -44,18 +44,19 @@ int main(void)
 void tx_application_define(void *first_unused_memory)
 {
     /* Create my_thread! */
-    tx_thread_create( &thread_ptr, 
-                     "my_thread", 
-                      my_thread_entry, 
-                      0x1234, 
+    tx_thread_create( &stThreadMain, 
+                     "thread_main", 
+                      thread_main, 
+                      0, 
                       first_unused_memory, 
-                      THREAD_STACK_SIZE, 
+                      MAIN_THREAD_STACK_SIZE, 
                       1,
                       1, 
                       0, // Time slicing unused if all threads have unique priorities     
                       TX_AUTO_START);
 }
-void my_thread_entry(ULONG initial_input)
+
+void thread_main(ULONG ctx)
 {
 
    while( true )
