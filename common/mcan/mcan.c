@@ -2,6 +2,7 @@
 
 #include "stm32h5xx_hal.h"
 #include "stm32h503xx.h"
+#include "tx_api.h"
 #include "mcan.h"
 
 /********** Static Variables and Data Structures ********/
@@ -9,7 +10,7 @@ static uint16_t MCAN_TimeStamp = 0;
 static const uint8_t MCAN_MAX_FILTERS = 2;
 static MCAN_DEV _currentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
-
+static TX_MUTEX mcanTxMutex;
 static sMCAN_Message* _mcanRxMessage;
 
 typedef enum {
@@ -326,6 +327,7 @@ __weak void MCAN_Rx_Handler()
 ***********************************************************************************/
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
+    int status = 0;
     sMCAN_ID mcanID = {
             .MCAN_TYPE = mcanType, 
             .MCAN_TX_Device = _currentDevice,
@@ -352,12 +354,16 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8
     };
 
     // Add frame to TX FIFO -> Transmit
-    if( HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan, &TxHeader, mcanData ) != HAL_OK )
+    tx_mutex_get(&mcanTxMutex, TX_WAIT_FOREVER); // enter critical section, suspend if mutex is locked
+    status = HAL_FDCAN_AddMessageToTxFifoQ(&_hfdcan, &TxHeader, mcanData );
+    tx_mutex_put(&mcanTxMutex);                  // exit critical section
+
+    if (status == HAL_OK)
     {
-        return false;
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 
