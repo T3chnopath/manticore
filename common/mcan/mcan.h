@@ -16,16 +16,18 @@ typedef enum {
     RESPONSE,
     VEHICLE_STATE,
     SENSOR_DATA,
-    LOG
-} MCAN_TYPE;
+    LOG,
+    HEARTBEAT,
+} MCAN_CAT;
 
 typedef enum {
-    POWER,
-    MAIN_COMPUTE,
-    DEPLOYMENT,
-    MIO,
-    CAMERA,
-    ALL_DEVICES,
+    DEV_POWER,
+    DEV_MAIN_COMPUTE,
+    DEV_DEPLOYMENT,
+    DEV_MIO,
+    DEV_CAMERA,
+    DEV_ALL,
+    DEV_DEBUG
 } MCAN_DEV;
 
 typedef enum {
@@ -36,7 +38,7 @@ typedef enum {
 } MCAN_PRI;
 
 typedef struct{
-    MCAN_TYPE MCAN_TYPE;
+    MCAN_CAT MCAN_CAT;
     MCAN_DEV MCAN_TX_Device; // Device that is sending
     MCAN_DEV MCAN_RX_Device; // Device that is receiving, to be received
     MCAN_PRI MCAN_PRIORITY;
@@ -58,7 +60,10 @@ void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage );
 bool MCAN_StartRX_IT( void );
 __weak void MCAN_RX_Handler( void ); // Called by ISR 
 
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
+
+void MCAN_EnableHeartBeats( MCAN_DEV mcanRxDevice, uint32_t delay );
+void MCAN_DisableHeartBeats( void );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
 void MCAN_IncTimeStamp( void );

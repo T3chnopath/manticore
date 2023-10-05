@@ -18,7 +18,7 @@ typedef enum {
     kMCAN_SHIFT_Priority = 16,
     kMCAN_SHIFT_RxDevice = 18,
     kMCAN_SHIFT_TxDevice = 22,
-    kMCAN_SHIFT_Type     = 26,
+    kMCAN_SHIFT_Cat     = 26,
 } MCAN_ID_SHIFTS;
 
 typedef enum {
@@ -26,7 +26,7 @@ typedef enum {
     mMCAN_Priority     =   0x03 , 
     mMCAN_RxDevice     =   0x0F ,
     mMCAN_TxDevice     =   0x0F ,
-    mMCAN_Type         =   0x07 ,
+    kMCAN_Cat         =   0x07 ,
 } MCAN_ID_MASK;
 
 
@@ -35,7 +35,15 @@ static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
 static bool _MCAN_ConfigFilter( void );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
+static void thread_heartbeat(ULONG ctx);
 
+
+// Heartbeat Thread
+#define THREAD_HEARTBEAT_STACK_SIZE 256
+static TX_THREAD stThreadHeartbeat;
+static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
+static MCAN_DEV heartbeatRxDevice;
+static uint32_t heartbeatPeriod;
 
 
 /***************************** Static Function Definitions *****************************/
@@ -152,7 +160,7 @@ static bool _MCAN_ConfigFilter( void )
 
     // Config second filter for all devices: 
     sFilterConfig.FilterIndex = 1;
-    sFilterConfig.FilterID1 = ALL_DEVICES << kMCAN_SHIFT_RxDevice;
+    sFilterConfig.FilterID1 = DEV_ALL << kMCAN_SHIFT_RxDevice;
 
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
@@ -181,7 +189,7 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
     mcanID->MCAN_PRIORITY   |= (uIdentifier >> kMCAN_SHIFT_Priority) & mMCAN_Priority;
     mcanID->MCAN_RX_Device  |= (uIdentifier >> kMCAN_SHIFT_RxDevice) & mMCAN_RxDevice;
     mcanID->MCAN_TX_Device  |= (uIdentifier >> kMCAN_SHIFT_TxDevice) & mMCAN_TxDevice;
-    mcanID->MCAN_TYPE       |= (uIdentifier >> kMCAN_SHIFT_Type) & mMCAN_Type;
+    mcanID->MCAN_CAT       |= (uIdentifier >> kMCAN_SHIFT_Cat) & kMCAN_Cat;
 }
 
 /*********************************************************************************
@@ -205,7 +213,7 @@ static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentif
     *uIdentifier |= (mcanID->MCAN_PRIORITY << kMCAN_SHIFT_Priority);
     *uIdentifier |= (mcanID->MCAN_RX_Device << kMCAN_SHIFT_RxDevice);
     *uIdentifier |= (mcanID->MCAN_TX_Device << kMCAN_SHIFT_TxDevice);
-    *uIdentifier |= (mcanID->MCAN_TYPE << kMCAN_SHIFT_Type);
+    *uIdentifier |= (mcanID->MCAN_CAT << kMCAN_SHIFT_Cat);
 }
 
 
@@ -325,11 +333,11 @@ __weak void MCAN_Rx_Handler()
         True  = successful transmission of message
         False = failed tranmission of message
 ***********************************************************************************/
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
     int status = 0;
     sMCAN_ID mcanID = {
-            .MCAN_TYPE = mcanType, 
+            .MCAN_CAT = mcanType, 
             .MCAN_TX_Device = _currentDevice,
             .MCAN_RX_Device = mcanRxDevice,
             .MCAN_PRIORITY = mcanPri,
@@ -366,6 +374,40 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_TYPE mcanType, MCAN_DEV mcanRxDevice, uint8
     return false;
 }
 
+
+/********************************************************************************
+ //TODO DOCUMENTATION UPDATE
+*/
+void MCAN_EnableHeartBeats( MCAN_DEV mcanRxDevice, uint32_t delay )
+{
+    static bool heartBeatThreadCreated = false;
+    heartbeatRxDevice = mcanRxDevice;
+    heartbeatPeriod = delay;
+
+    // If first time calling, create the thread but don't call it
+    if ( !heartBeatThreadCreated )
+    {
+        tx_thread_create( &stThreadHeartbeat, 
+                    "thread_heartbeat", 
+                    thread_heartbeat, 
+                    0, 
+                    auThreadHeartbeatStack, 
+                    THREAD_HEARTBEAT_STACK_SIZE, 
+                    6,
+                    6, 
+                    0, // Time slicing unused if all threads have unique priorities     
+                    TX_DONT_START); 
+        heartBeatThreadCreated = true;
+    }
+
+    // Enable the heartbeat thread
+    tx_thread_resume( &stThreadHeartbeat );
+}
+
+void MCAN_DisableHeartBeats( void )
+{
+    tx_thread_suspend( &stThreadHeartbeat );
+}
 
 /*********************************************************************************
     Name: MCAN_GetFDCAN_Handler 
@@ -460,3 +502,16 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         MCAN_Rx_Handler();
     }
 }
+
+
+// Threads
+void thread_heartbeat(ULONG ctx)
+{
+    uint8_t mcanTxData[] = { 0XDE, 0XCA, 0XF0, 0XC0, 0XFF, 0XEE, 0XCA, 0XFE };
+    while( true )
+    {
+       MCAN_TX( MCAN_DEBUG, HEARTBEAT, heartbeatRxDevice, mcanTxData);
+       tx_thread_sleep(heartbeatPeriod);
+    }
+}
+
