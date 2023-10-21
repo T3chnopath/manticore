@@ -1,7 +1,14 @@
 #include <string.h>
 
 #include "stm32h5xx_hal.h"
+
+#ifdef STM32H503
 #include "stm32h503xx.h"
+#elif STM32H563
+#include "stm32h563xx.h"
+#endif
+
+// #include "stm32h503xx.h"
 #include "tx_api.h"
 #include "mcan.h"
 
