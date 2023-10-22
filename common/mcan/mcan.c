@@ -255,26 +255,33 @@ bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMC
 ***********************************************************************************/
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
 {
-    if(mcanEnable)
+    switch(mcanEnable)
     {
-        if( HAL_FDCAN_Start( &_hfdcan ) != HAL_OK)
-        {
-            return false;
-        }
+        case MCAN_ENABLE:
 
-        if ( HAL_FDCAN_ActivateNotification( &_hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
-        {
-            return false;
-        }
-    }
+            if( HAL_FDCAN_Start( &_hfdcan ) != HAL_OK)
+            {
+                return false;
+            }
 
-    else
-    {
-        if ( HAL_FDCAN_DeactivateNotification(&_hfdcan, 0) != HAL_OK)
-        {
-            return false;
-        }
+            if ( HAL_FDCAN_ActivateNotification( &_hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
+            {
+                return false;
+            }
 
+            break;
+
+        case MCAN_DISABLE:
+        
+            if ( HAL_FDCAN_DeactivateNotification(&_hfdcan, 0) != HAL_OK)
+            {
+                return false;
+            }
+            
+            break;
+
+        default:
+            return false;
     }
     
     return true;
