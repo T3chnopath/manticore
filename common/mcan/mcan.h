@@ -7,9 +7,9 @@
 #include "stm32h5xx_hal.h"
 
 typedef enum {
-    FDCAN1_PERIPH,
-    FDCAN2_PERIPH,
-} FDCAN_INTERFACE;
+    MCAN_ENABLE,
+    MCAN_DISABLE,
+} MCAN_EN;
 
 typedef enum {
     COMMAND,
@@ -54,10 +54,9 @@ typedef struct
 // Caller must provide bufferssS for Rx and Tx.
 
 // sMCAN_Message struct, provided by the caller, is populated with Rx content upon ISR firing
-bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice );
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMCAN_Message* mcanRxMessage);
 
-void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage ); 
-bool MCAN_StartRX_IT( void );
+bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
 __weak void MCAN_RX_Handler( void ); // Called by ISR 
 
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );

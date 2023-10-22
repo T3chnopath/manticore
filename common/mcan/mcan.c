@@ -8,7 +8,6 @@
 #include "stm32h563xx.h"
 #endif
 
-// #include "stm32h503xx.h"
 #include "tx_api.h"
 #include "mcan.h"
 
@@ -38,7 +37,7 @@ typedef enum {
 
 
 /********** Static Function Declarations ********/
-static bool _MCAN_ConfigInterface ( FDCAN_INTERFACE eInterface );
+static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
 static bool _MCAN_ConfigFilter( void );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
@@ -70,32 +69,8 @@ static uint32_t heartbeatPeriod;
         True  = succesful config init
         False = config failure 
 *************************************************************/
-static bool _MCAN_ConfigInterface( FDCAN_INTERFACE eInterface )
+static bool _MCAN_ConfigInterface( FDCAN_GlobalTypeDef* FDCAN_Instance )
 {
-    FDCAN_GlobalTypeDef* FDCAN_Instance;
-    switch( eInterface )
-    {
-        #ifdef FDCAN1 
-        case FDCAN1_PERIPH:
-            FDCAN_Instance = FDCAN1;
-            break;
-        #endif
-
-        #ifdef FDCAN2
-        case FDCAN2_PERIPH:
-            FDCAN_Instance = FDCAN2;
-            break;
-        #endif
-
-        #if ( !defined(FDCAN1) && !defined(FDCAN2) )
-            #error "No FDCAN peripheral is defined!"
-        #endif
-
-        default:
-            FDCAN_Instance = FDCAN1;
-            break;
-    }
-
     // Configure for no BRS, 1MHz Nominal and 1MHz Data
     _hfdcan.Instance = FDCAN_Instance;
     _hfdcan.Init.ClockDivider = FDCAN_CLOCK_DIV1;
@@ -228,24 +203,29 @@ static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentif
 /***************************** Public Function Definitions *****************************/
 
 /*********************************************************************************
-    Name: MCAN_PeriphConfig
+    Name: MCAN_Init
     
     Description:
-        Configure FDCAN interface and filtering.
+        Configure FDCAN interface and filtering. Caller is fully responsible for 
+        configuring and enabling the FDCAN interface that is passed.
+
+        NOTE: MCAN Does not support registering two interfaces currently. 
 
     Arguments:
-        eInterface    = FDCAN interface that is selected ( 1 or 2 )
-        currentDevice = current module expecting reception
+        FDCAN_Instance = pointer to FDCAN_GlobalTypeDef instance
+        currentDevice  = current module expecting reception
+        sMCAN_Message  = pointer to MCAN Rx message buffer for reception
 
     Returns:
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMCAN_Message* mcanRxMessage )
 {
     _currentDevice = currentDevice;
+    _mcanRxMessage = mcanRxMessage;
 
-    if ( !_MCAN_ConfigInterface( eInterface ) )
+    if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
     {
         return false;
     }
@@ -258,47 +238,43 @@ bool MCAN_PeriphConfig( FDCAN_INTERFACE eInterface, MCAN_DEV currentDevice )
    return true;
 }
 
-/*****************************************************************
-    Name: MCAN_RegisterRx
-
-    Description:
-        Register an MCAN Message struct pointer as a buffer for
-        received messages. 
-
-    Arguments:
-        mcanRxMessage = pointer to an sMCAN_Message provided
-                        by the caller
-    Returns:
-        None
-******************************************************************/
-void MCAN_RegisterRX_Buf( sMCAN_Message* mcanRxMessage )
-{
-    _mcanRxMessage = mcanRxMessage;
-} 
 
 /*********************************************************************************
     Name: MCAN_StartRX_IT
     
     Description:
         Start the FDCAN interface in interrupt mode, given current configs.
+        Will always use RX FIFO0.
 
     Arguments:
-        None
+        mcanEnable = enables or disables the interrupt
 
     Returns:
         True  = succesful activation of peripheral and interrupt notifs
         False = failure to activate peripheral or interrupt notifs
 ***********************************************************************************/
-bool MCAN_StartRX_IT( void )
+bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
 {
-    if( HAL_FDCAN_Start( &_hfdcan ) != HAL_OK)
+    if(mcanEnable)
     {
-        return false;
+        if( HAL_FDCAN_Start( &_hfdcan ) != HAL_OK)
+        {
+            return false;
+        }
+
+        if ( HAL_FDCAN_ActivateNotification( &_hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
+        {
+            return false;
+        }
     }
 
-    if ( HAL_FDCAN_ActivateNotification( &_hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0 ) != HAL_OK)
+    else
     {
-        return false;
+        if ( HAL_FDCAN_DeactivateNotification(&_hfdcan, 0) != HAL_OK)
+        {
+            return false;
+        }
+
     }
     
     return true;
