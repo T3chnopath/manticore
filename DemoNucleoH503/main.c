@@ -1,6 +1,3 @@
-#include <stdbool.h>
-#include <string.h>
-
 #include "bsp_nucleo_h503.h"
 #include "tx_api.h"
 #include "mcan.h"
@@ -48,7 +45,7 @@ void thread_main(ULONG ctx)
 
     while( true )
     {
-        HAL_GPIO_TogglePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin);
+        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
         tx_thread_sleep(1000);
         
         // If MCAN_Rx, update the heart beat enable or disable

@@ -73,17 +73,17 @@ static void _BSP_GPIO_Init(void)
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     // GPIO Ports Clock Enable
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    LED_GREEN_PORT_CLK_EN();
 
     // Configure GPIO pin Output Level
-    HAL_GPIO_WritePin(LED1_GREEN_GPIO_Port, LED1_GREEN_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
 
     // Configure GPIO pin : LED1_GREEN_Pin
-    GPIO_InitStruct.Pin = LED1_GREEN_Pin;
+    GPIO_InitStruct.Pin = LED_GREEN_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(LED1_GREEN_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(LED_GREEN_GPIO_Port, &GPIO_InitStruct);
 }
 
 static void _BSP_FDCAN_Init(void)
@@ -95,9 +95,9 @@ static void _BSP_FDCAN_Init(void)
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
     PeriphClkInitStruct.PLL2.PLL2Source = RCC_PLL2_SOURCE_HSE;
     PeriphClkInitStruct.PLL2.PLL2M = 2;
-    PeriphClkInitStruct.PLL2.PLL2N = 16;
+    PeriphClkInitStruct.PLL2.PLL2N = 32;
     PeriphClkInitStruct.PLL2.PLL2P = 2;
-    PeriphClkInitStruct.PLL2.PLL2Q = 6;
+    PeriphClkInitStruct.PLL2.PLL2Q = 4;
     PeriphClkInitStruct.PLL2.PLL2R = 2;
     PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2_VCIRANGE_3;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2_VCORANGE_WIDE;

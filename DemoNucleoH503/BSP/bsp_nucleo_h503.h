@@ -13,8 +13,9 @@
 #define FDCAN1_EN
 
 // Pin Definitions
-#define LED1_GREEN_Pin GPIO_PIN_5
-#define LED1_GREEN_GPIO_Port GPIOA
+#define LED_GREEN_GPIO_Port     GPIOA
+#define LED_GREEN_Pin           GPIO_PIN_5
+#define LED_GREEN_PORT_CLK_EN() __HAL_RCC_GPIOA_CLK_ENABLE()
 
 #ifdef  FDCAN1_EN  
 #define FDCAN_TX_Port           GPIOB
