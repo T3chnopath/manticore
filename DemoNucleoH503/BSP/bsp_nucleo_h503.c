@@ -8,6 +8,7 @@ static void _BSP_FDCAN_Init(void);
 
 void BSP_Init(void)
 {
+    HAL_Init();
     _BSP_SystemClockConfig();
     _BSP_PeriphInit();
 }

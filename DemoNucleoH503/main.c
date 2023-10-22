@@ -18,9 +18,6 @@ void thread_main(ULONG ctx);
 
 int main(void)
 {
-    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-    HAL_Init();
-
     /* Initialize BSP */
     BSP_Init();
 
