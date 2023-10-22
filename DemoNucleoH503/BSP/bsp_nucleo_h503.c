@@ -1,6 +1,18 @@
 #include "bsp_nucleo_h503.h"
 
-void BSP_SystemClock_Config(void)
+static void _BSP_SystemClockConfig(void);
+static inline void _BSP_PeriphInit(void);
+static void _BSP_ErrorHandler(void);
+static void _BSP_GPIO_Init(void);
+static void _BSP_FDCAN_Init(void);
+
+void BSP_Init(void)
+{
+    _BSP_SystemClockConfig();
+    _BSP_PeriphInit();
+}
+
+static void _BSP_SystemClockConfig(void)
 {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
@@ -30,7 +42,7 @@ void BSP_SystemClock_Config(void)
     
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
     {
-        BSP_Error_Handler();
+        _BSP_ErrorHandler();
     }
 
     // Initializes the CPU, AHB and APB buses clocks
@@ -45,55 +57,17 @@ void BSP_SystemClock_Config(void)
     
     if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
     {
-      BSP_Error_Handler();
+      _BSP_ErrorHandler();
     }
 }
 
-void BSP_PeriphClock_Config(void)
+static inline void _BSP_PeriphInit(void)
 {
-    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    // Config FDCAN clock to be 32MHz
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
-    PeriphClkInitStruct.PLL2.PLL2Source = RCC_PLL2_SOURCE_HSE;
-    PeriphClkInitStruct.PLL2.PLL2M = 2;
-    PeriphClkInitStruct.PLL2.PLL2N = 16;
-    PeriphClkInitStruct.PLL2.PLL2P = 2;
-    PeriphClkInitStruct.PLL2.PLL2Q = 6;
-    PeriphClkInitStruct.PLL2.PLL2R = 2;
-    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2_VCIRANGE_3;
-    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2_VCORANGE_WIDE;
-    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
-    PeriphClkInitStruct.PLL2.PLL2ClockOut = RCC_PLL2_DIVQ;
-    PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL2Q;
-
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
-    {
-      BSP_Error_Handler();
-    }
-
-    /* Peripheral clock enable */
-    __HAL_RCC_FDCAN_CLK_ENABLE();
-
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**FDCAN1 GPIO Configuration
-    PB10     ------> FDCAN1_TX
-    PB12     ------> FDCAN1_RX
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_12;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    /* FDCAN1 interrupt Init */
-    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 2, 0);
-    HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);    
+    _BSP_GPIO_Init();
+    _BSP_FDCAN_Init();
 }
 
-
-void BSP_GPIO_Init(void)
+static void _BSP_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -111,7 +85,62 @@ void BSP_GPIO_Init(void)
     HAL_GPIO_Init(LED1_GREEN_GPIO_Port, &GPIO_InitStruct);
 }
 
-void BSP_Error_Handler(void)
+static void _BSP_FDCAN_Init(void)
+{
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Config FDCAN clock to be 32MHz
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
+    PeriphClkInitStruct.PLL2.PLL2Source = RCC_PLL2_SOURCE_HSE;
+    PeriphClkInitStruct.PLL2.PLL2M = 2;
+    PeriphClkInitStruct.PLL2.PLL2N = 16;
+    PeriphClkInitStruct.PLL2.PLL2P = 2;
+    PeriphClkInitStruct.PLL2.PLL2Q = 6;
+    PeriphClkInitStruct.PLL2.PLL2R = 2;
+    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2_VCIRANGE_3;
+    PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2_VCORANGE_WIDE;
+    PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
+    PeriphClkInitStruct.PLL2.PLL2ClockOut = RCC_PLL2_DIVQ;
+    PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL2Q;
+
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      _BSP_ErrorHandler();
+    }
+
+    // Peripheral Clock Enable 
+    __HAL_RCC_FDCAN_CLK_ENABLE();
+    FDCAN_RX_PORT_CLK_EN();
+    FDCAN_TX_PORT_CLK_EN();
+
+    // FDCAN GPIO Configuration
+    GPIO_InitStruct.Pin = FDCAN_TX_Pin | FDCAN_RX_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+    // Select alternate function based on FDCAN interface
+#ifdef FDCAN1_EN
+    GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN1;
+#elif FDCAN2_EN 
+    GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN2;
+#endif
+
+    HAL_GPIO_Init(FDCAN_TX_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(FDCAN_RX_Port, &GPIO_InitStruct);
+
+    // Interrupt init, default to IT0, preempt = 2, subpriority = 0 
+#ifdef FDCAN1_EN  
+    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
+#elif FDCAN2_EN
+    HAL_NVIC_SetPriority(FDCAN2_IT0_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(FDCAN2_IT0_IRQn);
+#endif 
+}
+
+static void _BSP_ErrorHandler(void)
 {
     __disable_irq();
     while (1)

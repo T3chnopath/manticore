@@ -10,14 +10,22 @@
 #include "stm32h5xx_ll_pwr.h"
 #include "stm32h5xx_ll_gpio.h"
 
+#define FDCAN1_EN
+
 // Pin Definitions
 #define LED1_GREEN_Pin GPIO_PIN_5
 #define LED1_GREEN_GPIO_Port GPIOA
 
+#ifdef  FDCAN1_EN  
+#define FDCAN_TX_Port           GPIOB
+#define FDCAN_TX_Pin            GPIO_PIN_10
+#define FDCAN_TX_PORT_CLK_EN()  __HAL_RCC_GPIOB_CLK_ENABLE()
+#define FDCAN_RX_Port           GPIOB
+#define FDCAN_RX_Pin            GPIO_PIN_12
+#define FDCAN_RX_PORT_CLK_EN()  __HAL_RCC_GPIOB_CLK_ENABLE()
+#endif
+
 // Public Functions
-void BSP_Error_Handler(void);
-void BSP_SystemClock_Config(void);
-void BSP_PeriphClock_Config(void);
-void BSP_GPIO_Init(void);
+void BSP_Init(void);
 
 #endif /* __MAIN_H */
