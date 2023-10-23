@@ -122,22 +122,17 @@ static void _BSP_FDCAN_Init(void)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 
     // Select alternate function based on FDCAN interface
-#ifdef FDCAN1_EN
+#if defined(FDCAN1_EN)
     GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN1;
-#elif FDCAN2_EN 
-    GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN2;
 #endif
 
     HAL_GPIO_Init(FDCAN_TX_Port, &GPIO_InitStruct);
     HAL_GPIO_Init(FDCAN_RX_Port, &GPIO_InitStruct);
 
     // Interrupt init, default to IT0, preempt = 2, subpriority = 0 
-#ifdef FDCAN1_EN  
+#if defined(FDCAN1_EN)
     HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
-#elif FDCAN2_EN
-    HAL_NVIC_SetPriority(FDCAN2_IT0_IRQn, 2, 0);
-    HAL_NVIC_EnableIRQ(FDCAN2_IT0_IRQn);
 #endif 
 }
 

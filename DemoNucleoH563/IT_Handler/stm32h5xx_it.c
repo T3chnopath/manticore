@@ -19,3 +19,8 @@ void FDCAN1_IT0_IRQHandler(void)
 {
     HAL_FDCAN_IRQHandler(MCAN_GetFDCAN_Handle());
 }
+
+void FDCAN2_IT0_IRQHandler(void)
+{
+    HAL_FDCAN_IRQHandler(MCAN_GetFDCAN_Handle());
+}

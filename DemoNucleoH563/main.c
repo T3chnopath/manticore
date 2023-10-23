@@ -19,7 +19,7 @@ int main(void)
     /* Initialize BSP */
     BSP_Init();
 
-    MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
+    MCAN_Init( FDCAN2, DEV_MAIN_COMPUTE, &mcanRxMessage );
 
     tx_kernel_enter();
    }

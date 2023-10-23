@@ -10,7 +10,7 @@
 #include "stm32h5xx_ll_pwr.h"
 #include "stm32h5xx_ll_gpio.h"
 
-#define FDCAN1_EN
+#define FDCAN2_EN
 
 // Pin Definitions
 #define LED_GREEN_Pin           GPIO_PIN_0

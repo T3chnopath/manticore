@@ -17,6 +17,7 @@ target_include_directories(${BUILD_TARGET}.elf PUBLIC
 
 target_link_libraries(${BUILD_TARGET}.elf
     MCU_Support 
-    IT_Handler
+    Common
     BSP
+    IT_Handler
 )
