@@ -27,7 +27,7 @@ typedef enum {
     DEV_MIO,
     DEV_CAMERA,
     DEV_ALL,
-    DEV_DEBUG
+    DEV_HEARTBEAT
 } MCAN_DEV;
 
 typedef enum {
@@ -61,7 +61,7 @@ __weak void MCAN_RX_Handler( void ); // Called by ISR
 
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
 
-void MCAN_EnableHeartBeats( MCAN_DEV mcanRxDevice, uint32_t delay );
+void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );

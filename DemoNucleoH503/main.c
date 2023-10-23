@@ -11,6 +11,8 @@ static uint8_t auThreadMainStack[THREAD_MAIN_STACK_SIZE];
 static bool heartbeatFlag = false;
 static sMCAN_Message mcanRxMessage = { 0 };
 
+static uint8_t heartbeatData[] = { 0xDE, 0xCA, 0XF, 0xC0, 0xFF, 0xEE, 0xCA, 0xFE};
+
 void thread_main(ULONG ctx);
 
 int main(void)
@@ -54,7 +56,7 @@ void thread_main(ULONG ctx)
             switch(heartbeatFlag)
             {
                 case true:
-                    MCAN_EnableHeartBeats(DEV_DEBUG, 1000); 
+                    MCAN_EnableHeartBeats(1000, heartbeatData); 
                     break;
 
                 case false:

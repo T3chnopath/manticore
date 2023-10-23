@@ -7,6 +7,7 @@
 
 void SysTick_Handler(void)
 {
+  MCAN_IncTimeStamp();
   _tx_timer_interrupt();
 }
 

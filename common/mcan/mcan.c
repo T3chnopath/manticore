@@ -18,6 +18,7 @@ static MCAN_DEV _currentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
 static sMCAN_Message* _mcanRxMessage;
+static uint8_t* heartbeatDataBuf;
 
 typedef enum {
     kMCAN_SHIFT_MessageStamp = 0,
@@ -48,7 +49,6 @@ static void thread_heartbeat(ULONG ctx);
 #define THREAD_HEARTBEAT_STACK_SIZE 256
 static TX_THREAD stThreadHeartbeat;
 static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
-static MCAN_DEV heartbeatRxDevice;
 static uint32_t heartbeatPeriod;
 
 
@@ -368,10 +368,10 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_
 /********************************************************************************
  //TODO DOCUMENTATION UPDATE
 */
-void MCAN_EnableHeartBeats( MCAN_DEV mcanRxDevice, uint32_t delay )
+void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData )
 {
     static bool heartBeatThreadCreated = false;
-    heartbeatRxDevice = mcanRxDevice;
+    heartbeatDataBuf = heartbeatData;
     heartbeatPeriod = delay;
 
     // If first time calling, create the thread but don't call it
@@ -497,10 +497,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 // Threads
 void thread_heartbeat(ULONG ctx)
 {
-    uint8_t mcanTxData[] = { 0XDE, 0XCA, 0XF0, 0XC0, 0XFF, 0XEE, 0XCA, 0XFE };
     while( true )
     {
-       MCAN_TX( MCAN_DEBUG, HEARTBEAT, heartbeatRxDevice, mcanTxData);
+       MCAN_TX( MCAN_DEBUG, HEARTBEAT, DEV_HEARTBEAT, heartbeatDataBuf);
        tx_thread_sleep(heartbeatPeriod);
     }
 }
