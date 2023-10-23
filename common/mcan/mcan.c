@@ -12,14 +12,6 @@
 #include "mcan.h"
 
 /********** Static Variables and Data Structures ********/
-static uint16_t MCAN_TimeStamp = 0;
-static const uint8_t MCAN_MAX_FILTERS = 2;
-static MCAN_DEV _currentDevice;
-static FDCAN_HandleTypeDef _hfdcan ;
-static TX_MUTEX mcanTxMutex;
-static sMCAN_Message* _mcanRxMessage;
-static uint8_t* heartbeatDataBuf;
-
 typedef enum {
     kMCAN_SHIFT_MessageStamp = 0,
     kMCAN_SHIFT_Priority = 16,
@@ -36,20 +28,26 @@ typedef enum {
     kMCAN_Cat         =   0x07 ,
 } MCAN_ID_MASK;
 
+static const uint8_t MCAN_MAX_FILTERS = 2;
+static MCAN_DEV _currentDevice;
+static FDCAN_HandleTypeDef _hfdcan ;
+static TX_MUTEX mcanTxMutex;
+static sMCAN_Message* _mcanRxMessage;
+static uint8_t* heartbeatDataBuf;
+
+#define THREAD_HEARTBEAT_STACK_SIZE 256
+static TX_THREAD stThreadHeartbeat;
+static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
+static uint32_t heartbeatPeriod;
+
 
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
 static bool _MCAN_ConfigFilter( void );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
-static void thread_heartbeat(ULONG ctx);
-
-
-// Heartbeat Thread
-#define THREAD_HEARTBEAT_STACK_SIZE 256
-static TX_THREAD stThreadHeartbeat;
-static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
-static uint32_t heartbeatPeriod;
+static uint16_t _MCAN_GetTimestamp( void );
+static void thread_heartbeat( ULONG ctx );
 
 
 /***************************** Static Function Definitions *****************************/
@@ -198,6 +196,11 @@ static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentif
     *uIdentifier |= (mcanID->MCAN_CAT << kMCAN_SHIFT_Cat);
 }
 
+static inline uint16_t _MCAN_GetTimestamp( void )
+{
+    return (HAL_GetTick() / 1000) % UINT16_MAX;
+}
+
 
 
 /***************************** Public Function Definitions *****************************/
@@ -331,7 +334,7 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_
             .MCAN_TX_Device = _currentDevice,
             .MCAN_RX_Device = mcanRxDevice,
             .MCAN_PRIORITY = mcanPri,
-            .MCAN_TIME_STAMP = MCAN_TimeStamp,
+            .MCAN_TIME_STAMP = _MCAN_GetTimestamp(),
     };
     
     // Interpret 32 bit idenfitier from MCAN message struct ID
@@ -419,36 +422,6 @@ FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
     return &_hfdcan;
 }
 
-/*********************************************************************************
-    Name: MCAN_IncTimeStamp
-    
-    Description:
-        Called in HAL_GetTick every millisecond. Increments the MCAN_TimeStamp
-        every 1000 milliseconds.
-
-    Arguments:
-        None
-
-    Returns:
-        None
-***********************************************************************************/
-void MCAN_IncTimeStamp( void )
-{
-    static uint16_t ms;
-
-    if ( ms == 1000 )
-    {   
-        // Increment timestamp if less than UINT16_MAX, otherwise reset
-        MCAN_TimeStamp = ( MCAN_TimeStamp < UINT16_MAX) ? MCAN_TimeStamp + 1 : 0;
-        ms = 0; 
-    }
-    else
-    {
-        ms++;
-    }
-}
-
-
 
 /***************************** External Overrides *****************************/
 
@@ -487,14 +460,13 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
 
         // Update time stamp to be time of reception
-        _mcanRxMessage->mcanID.MCAN_TIME_STAMP = MCAN_TimeStamp;
+        _mcanRxMessage->mcanID.MCAN_TIME_STAMP = _MCAN_GetTimestamp();
 
         MCAN_Rx_Handler();
     }
 }
 
-
-// Threads
+/***************************** Threads *****************************/
 void thread_heartbeat(ULONG ctx)
 {
     while( true )
@@ -503,4 +475,3 @@ void thread_heartbeat(ULONG ctx)
        tx_thread_sleep(heartbeatPeriod);
     }
 }
-

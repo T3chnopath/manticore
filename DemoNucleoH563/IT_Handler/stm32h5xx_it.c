@@ -7,14 +7,12 @@
 
 void SysTick_Handler(void)
 {
-  MCAN_IncTimeStamp();
   _tx_timer_interrupt();
 }
 
 uint32_t HAL_GetTick(void)
 {
   return _tx_time_get();
-  MCAN_IncTimeStamp();
 }
 
 void FDCAN1_IT0_IRQHandler(void)

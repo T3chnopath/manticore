@@ -65,6 +65,5 @@ void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
-void MCAN_IncTimeStamp( void );
 
 #endif /* __MCAN_H */
