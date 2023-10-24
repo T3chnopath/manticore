@@ -1,4 +1,5 @@
 #include "bsp_nucleo_h503.h"
+#include "utility.h"
 
 static void _BSP_SystemClockConfig(void);
 static inline void _BSP_PeriphInit(void);
@@ -73,7 +74,7 @@ static void _BSP_GPIO_Init(void)
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     // GPIO Ports Clock Enable
-    LED_GREEN_PORT_CLK_EN();
+    GPIO_PortClkEnable(LED_GREEN_GPIO_Port);
 
     // Configure GPIO pin Output Level
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
@@ -112,8 +113,8 @@ static void _BSP_FDCAN_Init(void)
 
     // Peripheral Clock Enable 
     __HAL_RCC_FDCAN_CLK_ENABLE();
-    FDCAN_RX_PORT_CLK_EN();
-    FDCAN_TX_PORT_CLK_EN();
+    GPIO_PortClkEnable(FDCAN_TX_Port);
+    GPIO_PortClkEnable(FDCAN_RX_Port);
 
     // FDCAN GPIO Configuration
     GPIO_InitStruct.Pin = FDCAN_TX_Pin | FDCAN_RX_Pin;
