@@ -26,7 +26,7 @@ typedef enum{
 //DC Motor Direction Enum
 typedef enum{
     CLOCKWISE               = 0x00U,
-    COUNTER_CLOCKWISE       = 0x01u
+    COUNTER_CLOCKWISE       = 0x01U
 } DCMotor_Direction;
 
 //DC Motor Struct

@@ -1,7 +1,7 @@
 #include "bsp_nucleo_h563.h"
 #include "tx_api.h"
 #include "mcan.h"
-
+#include "bno055.h"
 
 // Main Thread
 #define THREAD_MAIN_STACK_SIZE 512
