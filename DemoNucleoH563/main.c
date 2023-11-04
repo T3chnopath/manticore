@@ -3,6 +3,10 @@
 #include "mcan.h"
 #include "bno055.h"
 
+// Global Instance
+I2C_HandleTypeDef hi2c1;
+BNO055_ERROR bno055_error;
+
 // Main Thread
 #define THREAD_MAIN_STACK_SIZE 512
 static TX_THREAD stThreadMain;
@@ -43,6 +47,14 @@ void thread_main(ULONG ctx)
 {
     MCAN_SetEnableIT(MCAN_ENABLE);
     bool heartbeatFlagPrevious = false;
+
+    tx_thread_sleep(700);
+
+    BNO055_I2C_Mount(&hi2c1);
+    bno055_error = BNO055_Init();
+    if(bno055_error != BNO055_NOT_DETECTED){
+        while(1);
+    }
 
     while( true )
     {
