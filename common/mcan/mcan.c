@@ -69,7 +69,7 @@ static void thread_heartbeat( ULONG ctx );
 *************************************************************/
 static bool _MCAN_ConfigInterface( FDCAN_GlobalTypeDef* FDCAN_Instance )
 {
-    // Configure for no BRS, 1MHz Nominal and 1MHz Data
+    Configure for no BRS, 1MHz Nominal and 1MHz Data
     _hfdcan.Instance = FDCAN_Instance;
     _hfdcan.Init.ClockDivider = FDCAN_CLOCK_DIV1;
     _hfdcan.Init.FrameFormat = FDCAN_FRAME_FD_NO_BRS;
@@ -88,8 +88,8 @@ static bool _MCAN_ConfigInterface( FDCAN_GlobalTypeDef* FDCAN_Instance )
     _hfdcan.Init.StdFiltersNbr = 0;
     _hfdcan.Init.ExtFiltersNbr = MCAN_MAX_FILTERS;
     _hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-
-    if (HAL_FDCAN_Init(&_hfdcan) != HAL_OK)
+ 
+ if (HAL_FDCAN_Init(&_hfdcan) != HAL_OK)
     {
         return false;
     }
