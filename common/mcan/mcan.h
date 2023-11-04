@@ -59,7 +59,7 @@ bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMC
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
 __weak void MCAN_RX_Handler( void ); // Called by ISR 
 
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t* mcanData );
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 
 void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
