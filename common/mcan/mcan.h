@@ -25,7 +25,7 @@ typedef enum {
     DEV_MAIN_COMPUTE,
     DEV_DEPLOYMENT,
     DEV_MIO,
-    DEV_CAMERA,
+    DEV_MTUSC,
     DEV_ALL,
     DEV_HEARTBEAT
 } MCAN_DEV;
