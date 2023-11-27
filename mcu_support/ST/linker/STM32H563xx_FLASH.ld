@@ -166,6 +166,8 @@ SECTIONS
   } >RAM
 
   __RAM_segment_used_end__ = .;
+  PROVIDE ( end = . );
+  PROVIDE ( _end = . );
 
   /* Remove information from the compiler libraries */
   /DISCARD/ :
