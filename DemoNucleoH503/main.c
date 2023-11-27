@@ -22,6 +22,9 @@ static const uint16_t HEARTBEAT_DELAY_MS = 1000;
 static uint8_t heartbeatData[] = {0xDE, 0xCA, 0xFF, 0xC0, 0xFF, 0xEE, 0xCA, 0xFE};
 static bool heartbeatFlag = false;
 
+// Serial Console Testing
+extern UART_HandleTypeDef ConsoleUart;
+static uint8_t buffer[] = "hello world \r\n";
 
 int main(void)
 {
@@ -92,6 +95,7 @@ void thread_blink(ULONG ctx)
 {
     while(true)
     {
+        HAL_UART_Transmit(&ConsoleUart, buffer, sizeof(buffer), HAL_MAX_DELAY);
         HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
         tx_thread_sleep(THREAD_BLINK_DELAY_MS);
     }

@@ -6,9 +6,12 @@ static void _BSP_SystemClockConfig(void);
 static void _BSP_ErrorHandler(void);
 static void _BSP_GPIO_Init(void);
 static void _BSP_FDCAN_Init(void);
+static void _BSP_UART_Init(void);
 
 static const uint16_t BSP_CLK_DELAY_MS = 500;
 static const uint16_t BSP_DELAY_MS = 1000;
+
+UART_HandleTypeDef ConsoleUart;
 
 void BSP_Init(void)
 {
@@ -18,6 +21,7 @@ void BSP_Init(void)
     
     _BSP_GPIO_Init();
     _BSP_FDCAN_Init();
+    _BSP_UART_Init();
     tx_thread_sleep(BSP_DELAY_MS);
 }
 
@@ -136,6 +140,72 @@ static void _BSP_FDCAN_Init(void)
     HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 2, 0);
     HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
 #endif 
+}
+
+static void _BSP_UART_Init(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};    
+
+    // UART3 CLK Enable 
+#ifdef UART3_EN
+    __HAL_RCC_USART3_CLK_ENABLE();
+#endif 
+
+#ifdef UART3_EN
+    ConsoleUart.Instance            = USART3;
+#endif
+    ConsoleUart.Init.BaudRate       = UART_BAUDRATE;
+    ConsoleUart.Init.WordLength     = UART_WORDLENGTH_8B;
+    ConsoleUart.Init.StopBits       = UART_STOPBITS_1;
+    ConsoleUart.Init.Parity         = UART_PARITY_NONE;
+    ConsoleUart.Init.Mode           = UART_MODE_TX_RX;
+    ConsoleUart.Init.HwFlowCtl      = UART_HWCONTROL_NONE;
+    ConsoleUart.Init.OverSampling   = UART_OVERSAMPLING_16;
+    ConsoleUart.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+    ConsoleUart.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+    ConsoleUart.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+
+    if (HAL_UART_Init(&ConsoleUart) != HAL_OK)
+    {
+        _BSP_ErrorHandler();
+    }
+    if (HAL_UARTEx_SetTxFifoThreshold(&ConsoleUart, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
+        _BSP_ErrorHandler();
+    }
+    if (HAL_UARTEx_SetRxFifoThreshold(&ConsoleUart, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+    {
+        _BSP_ErrorHandler();
+    }
+    if (HAL_UARTEx_DisableFifoMode(&ConsoleUart) != HAL_OK)
+    {
+        _BSP_ErrorHandler();
+    }
+
+#ifdef UART3_EN
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART3;
+    PeriphClkInitStruct.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
+#endif
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+        _BSP_ErrorHandler();
+    }
+
+    //Enable GPIOA Clock
+    GPIO_PortClkEnable(UART_RX_Port);
+    GPIO_PortClkEnable(UART_TX_Port);
+
+    // UART3 GPIO Configuration
+    GPIO_InitStruct.Pin   = UART_TX_Pin|UART_RX_Pin;
+    GPIO_InitStruct.Mode  = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull  = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+#ifdef UART3_EN
+    GPIO_InitStruct.Alternate = GPIO_AF13_USART3;
+#endif
+    HAL_GPIO_Init(UART_TX_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(UART_RX_Port, &GPIO_InitStruct);
 }
 
 static void _BSP_ErrorHandler(void)
