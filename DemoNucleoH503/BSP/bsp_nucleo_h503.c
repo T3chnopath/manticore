@@ -1,17 +1,24 @@
 #include "bsp_nucleo_h503.h"
 #include "utility.h"
+#include "tx_api.h"
 
 static void _BSP_SystemClockConfig(void);
-static inline void _BSP_PeriphInit(void);
 static void _BSP_ErrorHandler(void);
 static void _BSP_GPIO_Init(void);
 static void _BSP_FDCAN_Init(void);
+
+static const uint16_t BSP_CLK_DELAY_MS = 500;
+static const uint16_t BSP_DELAY_MS = 1000;
 
 void BSP_Init(void)
 {
     HAL_Init();
     _BSP_SystemClockConfig();
-    _BSP_PeriphInit();
+    tx_thread_sleep(BSP_CLK_DELAY_MS);
+    
+    _BSP_GPIO_Init();
+    _BSP_FDCAN_Init();
+    tx_thread_sleep(BSP_DELAY_MS);
 }
 
 static void _BSP_SystemClockConfig(void)
@@ -61,12 +68,6 @@ static void _BSP_SystemClockConfig(void)
     {
       _BSP_ErrorHandler();
     }
-}
-
-static inline void _BSP_PeriphInit(void)
-{
-    _BSP_GPIO_Init();
-    _BSP_FDCAN_Init();
 }
 
 static void _BSP_GPIO_Init(void)
