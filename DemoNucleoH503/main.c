@@ -1,17 +1,17 @@
 #include "bsp_nucleo_h503.h"
 #include "tx_api.h"
 #include "mcan.h"
-
+#include "console.h"
 
 // Main Thread
-#define THREAD_MAIN_STACK_SIZE 1024
+#define THREAD_MAIN_STACK_SIZE 2048
 static TX_THREAD stThreadMain;
 static uint8_t auThreadMainStack[THREAD_MAIN_STACK_SIZE];
-static const uint8_t THREAD_MAIN_DELAY_MS = 10;
+static const uint16_t THREAD_MAIN_DELAY_MS = 10;
 void thread_main(ULONG ctx);
 
 // Blink Thread
-#define THREAD_BLINK_STACK_SIZE 2048
+#define THREAD_BLINK_STACK_SIZE 256
 static TX_THREAD stThreadBlink;
 static uint8_t auThreadBlinkStack[THREAD_BLINK_STACK_SIZE];
 static const uint16_t THREAD_BLINK_DELAY_MS = 1000;
@@ -24,7 +24,6 @@ static bool heartbeatFlag = false;
 
 // Serial Console Testing
 extern UART_HandleTypeDef ConsoleUart;
-static uint8_t buffer[] = "hello world \r\n";
 
 int main(void)
 {
@@ -68,6 +67,8 @@ void thread_main(ULONG ctx)
     // Init App Layer
     MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
     MCAN_SetEnableIT(MCAN_ENABLE);
+
+    ConsoleRegisterHandle(&ConsoleUart);
     
     while( true )
     {
@@ -86,16 +87,15 @@ void thread_main(ULONG ctx)
             }
             heartbeatFlagPrevious = heartbeatFlag;
         }
-
+        
         tx_thread_sleep(THREAD_MAIN_DELAY_MS);
     }
 }
 
-void thread_blink(ULONG ctx)
+
 {
     while(true)
     {
-        HAL_UART_Transmit(&ConsoleUart, buffer, sizeof(buffer), HAL_MAX_DELAY);
         HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
         tx_thread_sleep(THREAD_BLINK_DELAY_MS);
     }
