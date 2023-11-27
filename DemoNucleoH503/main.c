@@ -11,7 +11,7 @@ static const uint8_t THREAD_MAIN_DELAY_MS = 10;
 void thread_main(ULONG ctx);
 
 // Blink Thread
-#define THREAD_BLINK_STACK_SIZE 512
+#define THREAD_BLINK_STACK_SIZE 2048
 static TX_THREAD stThreadBlink;
 static uint8_t auThreadBlinkStack[THREAD_BLINK_STACK_SIZE];
 static const uint16_t THREAD_BLINK_DELAY_MS = 1000;
@@ -25,12 +25,7 @@ static bool heartbeatFlag = false;
 
 int main(void)
 {
-    /* Initialize BSP */
-    BSP_Init();
-
-    MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
-
-    tx_kernel_enter();
+       tx_kernel_enter();
    }
 
 void tx_application_define(void *first_unused_memory)
@@ -62,9 +57,15 @@ void tx_application_define(void *first_unused_memory)
 
 void thread_main(ULONG ctx)
 {
-    MCAN_SetEnableIT(MCAN_ENABLE);
     bool heartbeatFlagPrevious = false;
 
+    // Init BSP
+    BSP_Init();
+
+    // Init App Layer
+    MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
+    MCAN_SetEnableIT(MCAN_ENABLE);
+    
     while( true )
     {
         // If MCAN_Rx, update the heart beat enable or disable
@@ -89,8 +90,11 @@ void thread_main(ULONG ctx)
 
 void thread_blink(ULONG ctx)
 {
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    tx_thread_sleep(THREAD_BLINK_DELAY_MS);
+    while(true)
+    {
+        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+        tx_thread_sleep(THREAD_BLINK_DELAY_MS);
+    }
 }
 
 void MCAN_Rx_Handler( void )
