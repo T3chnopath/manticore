@@ -5,12 +5,13 @@
 
 #include "console.h"
 #include "stm32h5xx_hal.h"
-
+#include "tx_api.h"
 
 static UART_HandleTypeDef * _ConsoleUart;
 #define CONSOLE_PRI_MAX_CHAR 10
 #define CONSOLE_MAX_CHAR 50
 static char ConsoleBuff[CONSOLE_MAX_CHAR];
+static TX_MUTEX ConsoleBuffMutex;
 
 void ConsoleRegisterHandle(UART_HandleTypeDef * ConsoleUart)
 {
@@ -20,43 +21,71 @@ void ConsoleRegisterHandle(UART_HandleTypeDef * ConsoleUart)
 bool ConsoleLog(LOG_PRI pri, char message[], ...)
 {
     va_list ap;
+    char logBuff[CONSOLE_MAX_CHAR];
     uint16_t totalLen = strlen(message) + CONSOLE_PRI_MAX_CHAR;
    
     if ( totalLen > CONSOLE_MAX_CHAR )
     {
         return false;
     }
-    
-     // Clear buffer
-    memset(ConsoleBuff, 0, sizeof(ConsoleBuff));
 
     // Populate beginning of Console Buffer with a priority
     switch(pri)
     {
         case LOG_ERROR:
-            sprintf(ConsoleBuff, "[ERROR]   ");
+            sprintf(logBuff, "[ERROR]   ");
             break;
     
         case LOG_WARNING:
-            sprintf(ConsoleBuff, "[WARNING] ");
+            sprintf(logBuff, "[WARNING] ");
             break;
 
         case LOG_INFO:
-            sprintf(ConsoleBuff, "[INFO]    ");
+            sprintf(logBuff, "[INFO]    ");
             break;
 
         case LOG_DEBUG:
-            sprintf(ConsoleBuff, "[DEBUG]   ");
+            sprintf(logBuff, "[DEBUG]   ");
             break;
     }
 
     // Insert variadic arguments into console buffer
     va_start(ap, message);
-    vsprintf(ConsoleBuff + CONSOLE_PRI_MAX_CHAR, message, ap);
+    vsprintf(logBuff + CONSOLE_PRI_MAX_CHAR, message, ap);
     va_end(ap);
 
     // Log message
-    HAL_UART_Transmit(_ConsoleUart, ConsoleBuff, CONSOLE_MAX_CHAR, HAL_MAX_DELAY);
+    ConsolePrint(logBuff);
+
+    return true;
+}
+
+bool ConsolePrint(char message[], ...)
+{
+    va_list ap;
+    uint8_t messageLen = strlen(message);
+    
+    if(messageLen > CONSOLE_MAX_CHAR)
+    {
+        return false;
+    }
+
+    // Acquire mutex 
+    tx_mutex_get(&ConsoleBuffMutex, TX_WAIT_FOREVER); // enter critical section, suspend if mutex is locked
+   
+    // Clear buffer
+    memset(ConsoleBuff, 0, sizeof(ConsoleBuff));
+
+    // Insert variadic arguments into console buffer
+    va_start(ap, message);
+    vsprintf(ConsoleBuff, message, ap);
+    va_end(ap);
+
+    // Print message
+    HAL_UART_Transmit(_ConsoleUart, ConsoleBuff, messageLen, HAL_MAX_DELAY);
+
+    // Release console buff mutex    
+    tx_mutex_put(&ConsoleBuffMutex);                  // exit critical section
 
     return true;
 }

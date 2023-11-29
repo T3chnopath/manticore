@@ -7,11 +7,11 @@
 #define THREAD_MAIN_STACK_SIZE 2048
 static TX_THREAD stThreadMain;
 static uint8_t auThreadMainStack[THREAD_MAIN_STACK_SIZE];
-static const uint16_t THREAD_MAIN_DELAY_MS = 10;
+static const uint16_t THREAD_MAIN_DELAY_MS = 1000;
 void thread_main(ULONG ctx);
 
 // Blink Thread
-#define THREAD_BLINK_STACK_SIZE 256
+#define THREAD_BLINK_STACK_SIZE 512
 static TX_THREAD stThreadBlink;
 static uint8_t auThreadBlinkStack[THREAD_BLINK_STACK_SIZE];
 static const uint16_t THREAD_BLINK_DELAY_MS = 1000;
@@ -89,10 +89,13 @@ void thread_main(ULONG ctx)
         }
         
         tx_thread_sleep(THREAD_MAIN_DELAY_MS);
+        ConsolePrint("Hello world! %d %d %d \r\n", 1, 2, 3);
+        ConsoleLog(LOG_DEBUG, "hellooo debug! %f \r\n", 3.14);
+
     }
 }
 
-
+void thread_blink(ULONG ctx)
 {
     while(true)
     {
