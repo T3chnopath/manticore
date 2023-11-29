@@ -10,7 +10,7 @@
 static UART_HandleTypeDef * _ConsoleUart;
 
 #define CONSOLE_PRI_MAX_CHAR 10
-#define CONSOLE_MAX_CHAR 50
+#define CONSOLE_MAX_CHAR 100
 static char ConsoleBuff[CONSOLE_MAX_CHAR];
 static TX_MUTEX ConsoleBuffMutex;
 
@@ -18,17 +18,19 @@ static TX_MUTEX ConsoleBuffMutex;
 static uint8_t registeredCommands = 0;
 static ConsoleComm_t *ConsoleCommArr[MAX_COMMANDS] = {0};
 
+static bool enableConsolePrint = false;
+
 // Static function Declarations
-bool _tokenizeInput(char input[], char *argv[]); // Accept the input from terminal and set argv to the tokens. 
+uint8_t _tokenizeInput(char input[], char *argv[]); // Accept the input from terminal and set argv to the tokens. 
                                                  // Returns number of processed arguments.
 
 bool _addComm(ConsoleComm_t *comm);              // Add command to the commArr
 int8_t _findComm(char commName[]);               // Find command in the commArr by name
 
 // Static Function Definitions
-bool _tokenizeInput(char input[], char *argv[])
+uint8_t _tokenizeInput(char input[], char *argv[])
 {
-    const char delimit = " ";
+    const char delimit = ' ';
     char *token;
     uint8_t argvIndex = 0;
 
@@ -59,7 +61,7 @@ bool _addComm(ConsoleComm_t *comm)
 
 int8_t _findComm(char commName[])
 {
-    for(uint8_t i = 0; i <= registeredCommands)
+    for(uint8_t i = 0; i <= registeredCommands; i++)
     {
         if( strcmp(ConsoleCommArr[i]->name, commName ) )
         {
@@ -122,8 +124,10 @@ bool ConsolePrint(char message[], ...)
 {
     va_list ap;
     uint8_t messageLen = strlen(message);
+    uint8_t constructedMessageLen;
     
-    if(messageLen > CONSOLE_MAX_CHAR)
+    // Only print if enabled through the serial console
+    if(messageLen > CONSOLE_MAX_CHAR || !enableConsolePrint)
     {
         return false;
     }
@@ -138,17 +142,51 @@ bool ConsolePrint(char message[], ...)
     va_start(ap, message);
     vsprintf(ConsoleBuff, message, ap);
     va_end(ap);
+    
+    // Force NULL termination
+    ConsoleBuff[CONSOLE_MAX_CHAR] = NULL;
 
-    // Print message
-    HAL_UART_Transmit(_ConsoleUart, ConsoleBuff, messageLen, HAL_MAX_DELAY);
+    // Get length of message after variadic arguments inserted
+    constructedMessageLen = strlen(ConsoleBuff);
+    if ( constructedMessageLen > CONSOLE_MAX_CHAR)
+    {
+        return false;
+    }
 
+    // Print
+    HAL_UART_Transmit(_ConsoleUart, (uint8_t *) ConsoleBuff, constructedMessageLen, HAL_MAX_DELAY);
+    
     // Release console buff mutex    
     tx_mutex_put(&ConsoleBuffMutex);                  // exit critical section
 
     return true;
 }
 
-void ConsoleRegisterCommand(ConsoleComm_t_t * command)
+bool ConsoleRegisterComm(ConsoleComm_t * command)
 {
+    return (bool) _addComm(command);
+}
 
+void ConsoleMenu(void)
+{
+    enableConsolePrint = true; 
+    ConsolePrint("Welcome to manticore Serial Console \r\n");
+    ConsolePrint("Please select a command: \r\n");
+    char spaceBuff[CONSOLE_NAME_MAX_CHAR];
+
+    for(uint8_t i = 0; i < registeredCommands; i++)
+    {
+        ConsolePrint("%s", ConsoleCommArr[i]->name);
+
+        // Right align command description
+        for(char j = 0; j < CONSOLE_NAME_MAX_CHAR - strlen(ConsoleCommArr[i]->name); j++ )
+        {
+            sprintf(spaceBuff + j, " ");
+        }
+
+        ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
+    }
+
+    ConsolePrint("\r\n");
+    enableConsolePrint = false;
 }

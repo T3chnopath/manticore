@@ -25,6 +25,30 @@ static bool heartbeatFlag = false;
 // Serial Console Testing
 extern UART_HandleTypeDef ConsoleUart;
 
+void HelloWorld(char *argv[])
+{
+    ConsolePrint("Hello world!");
+}
+
+void Test(char *argv[])
+{
+    ConsolePrint("This is a test!");
+}
+
+static ConsoleComm_t CommHelloWorld = {
+    "Hello World",
+    "Prints hello world.",
+    0,
+    HelloWorld,
+};
+
+static ConsoleComm_t CommTest = {
+    "Test",
+    "This is a test",
+    0,
+    Test,
+};
+
 int main(void)
 {
        tx_kernel_enter();
@@ -69,6 +93,9 @@ void thread_main(ULONG ctx)
     MCAN_SetEnableIT(MCAN_ENABLE);
 
     ConsoleRegisterHandle(&ConsoleUart);
+    ConsoleRegisterComm(&CommHelloWorld);
+    ConsoleRegisterComm(&CommTest);
+    ConsoleMenu();
     
     while( true )
     {
@@ -89,8 +116,6 @@ void thread_main(ULONG ctx)
         }
         
         tx_thread_sleep(THREAD_MAIN_DELAY_MS);
-        ConsolePrint("Hello world! %d %d %d \r\n", 1, 2, 3);
-        ConsoleLog(LOG_DEBUG, "hellooo debug! %f \r\n", 3.14);
 
     }
 }

@@ -6,7 +6,7 @@
 #include "stm32h5xx_hal.h"
 
 #define CONSOLE_NAME_MAX_CHAR 15
-#define CONSOLE_HELP_MAX_CHAR 30
+#define CONSOLE_HELP_MAX_CHAR 50
 
 typedef enum
 {
@@ -27,7 +27,7 @@ typedef struct
 void ConsoleRegisterHandle(UART_HandleTypeDef *ConsoleUart);
 bool ConsoleLog(LOG_PRI pri, char message[], ...);
 bool ConsolePrint(char message[], ...);
-void ConsoleRegisterComm(ConsoleComm_t *command);
+bool ConsoleRegisterComm(ConsoleComm_t *command);
 void ConsoleMenu(void);
 
 #endif
