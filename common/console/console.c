@@ -8,11 +8,69 @@
 #include "tx_api.h"
 
 static UART_HandleTypeDef * _ConsoleUart;
+
 #define CONSOLE_PRI_MAX_CHAR 10
 #define CONSOLE_MAX_CHAR 50
 static char ConsoleBuff[CONSOLE_MAX_CHAR];
 static TX_MUTEX ConsoleBuffMutex;
 
+#define MAX_COMMANDS 10
+static uint8_t registeredCommands = 0;
+static ConsoleComm_t *ConsoleCommArr[MAX_COMMANDS] = {0};
+
+// Static function Declarations
+bool _tokenizeInput(char input[], char *argv[]); // Accept the input from terminal and set argv to the tokens. 
+                                                 // Returns number of processed arguments.
+
+bool _addComm(ConsoleComm_t *comm);              // Add command to the commArr
+int8_t _findComm(char commName[]);               // Find command in the commArr by name
+
+// Static Function Definitions
+bool _tokenizeInput(char input[], char *argv[])
+{
+    const char delimit = " ";
+    char *token;
+    uint8_t argvIndex = 0;
+
+    // Get first token
+    token = strtok(input, &delimit);
+
+    // Step through remaining tokens
+    while( token != NULL )
+    {
+        argv[argvIndex++] = token;
+        token = strtok(NULL, &delimit);
+    }
+
+    return ++argvIndex; 
+}
+
+
+bool _addComm(ConsoleComm_t *comm)
+{
+    if( registeredCommands == MAX_COMMANDS - 1)
+    {
+        return false;
+    }
+
+    ConsoleCommArr[registeredCommands++] = comm;
+    return true;
+}
+
+int8_t _findComm(char commName[])
+{
+    for(uint8_t i = 0; i <= registeredCommands)
+    {
+        if( strcmp(ConsoleCommArr[i]->name, commName ) )
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+// Global Functions
 void ConsoleRegisterHandle(UART_HandleTypeDef * ConsoleUart)
 {
     _ConsoleUart = ConsoleUart;
@@ -88,4 +146,9 @@ bool ConsolePrint(char message[], ...)
     tx_mutex_put(&ConsoleBuffMutex);                  // exit critical section
 
     return true;
+}
+
+void ConsoleRegisterCommand(ConsoleComm_t_t * command)
+{
+
 }

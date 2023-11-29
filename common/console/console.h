@@ -20,13 +20,14 @@ typedef struct
 {
     char name[CONSOLE_NAME_MAX_CHAR];
     char help[CONSOLE_HELP_MAX_CHAR];
-    void (*command)();
+    uint8_t argumentCount;
+    void (*command)(char *argv[]);
 } ConsoleComm_t;
 
-void ConsoleRegisterHandle(UART_HandleTypeDef * ConsoleUart);
+void ConsoleRegisterHandle(UART_HandleTypeDef *ConsoleUart);
 bool ConsoleLog(LOG_PRI pri, char message[], ...);
 bool ConsolePrint(char message[], ...);
-bool ConsoleRegisterComm(ConsoleComm_t * command);
-
+void ConsoleRegisterComm(ConsoleComm_t *command);
+void ConsoleMenu(void);
 
 #endif
