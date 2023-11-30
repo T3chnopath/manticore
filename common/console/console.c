@@ -16,12 +16,15 @@ static TX_MUTEX ConsoleOutBuffMutex;
 
 #define MAX_COMMANDS 10
 #define MAX_COMMAND_ARGS 4
+#define ARG_STRING_BUFF_SIZE 30
+#define COMM_HELP_SPACING 15
 static uint8_t registeredCommands = 0;
 static ConsoleComm_t *ConsoleCommArr[MAX_COMMANDS] = {0};
 
 
 static char *argvBuff[MAX_COMMAND_ARGS] = {0};
-char strings[MAX_STRINGS][MAX_LENGTH] = {0};
+static char argBuff[MAX_COMMAND_ARGS][ARG_STRING_BUFF_SIZE] = {0};
+static uint8_t _argIndex = 0;
 
 static const char unlockString[] = "console";
 static const uint16_t CONSOLE_IN_DELAY = 200;
@@ -29,13 +32,13 @@ static const char ENTER = '\r';
 static const char DEL = 127;
 static const char BACKSPACE = '\b';
 static const char SPACE = ' ';
+static const uint8_t IN_CHAR_SLEEP = 10;
 
 static bool enableLogging = false;
 
 static volatile char UART_RxChar;
 static volatile bool newChar = false;
 
-#define ARG_STRING_BUFF_SIZE 30
 static char _argStringBuff[ARG_STRING_BUFF_SIZE] = {0};
 
 // Console Thread
@@ -55,11 +58,9 @@ ConsoleComm_t *_getCommand(void);                       // [BLOCKING] process in
 
                                                     // Returns number of processed arguments.
 
+void _initArgvBuff(void);
 void _exeComm(ConsoleComm_t *comm);                 // Execute command
-
-bool _addComm(ConsoleComm_t *comm);                 // Add command to the commArr
-int8_t _findComm(char commName[]);                  // Find command in the commArr by name
-bool _processInput(char input[]);                    // tokenize string input and process it if there is a valid command
+int8_t _findCommIndex(char commName[]);                  // Find command in the commArr by name
 
 void _consoleUnlock(void)
 {
@@ -97,35 +98,36 @@ ConsoleComm_t *_getCommand(void)
 {
     char charFilter[] = {SPACE, ENTER};
     char inChar;  
-    uint8_t argvIndex = 0;
+    char inStringBuffer[CONSOLE_MAX_CHAR];
+    _argIndex = 0;
+    int8_t commIndex = 0;
+    char *token;
 
-    while(true)
-    {
-        inChar = ConsoleInStringFilter(_argStringBuff, ARG_STRING_BUFF_SIZE, charFilter, sizeof(charFilter) / sizeof(char));
+    // Clear previous arguments
+    memset(argBuff, 0, sizeof(argBuff));
 
-        if(inChar == SPACE)
-        {
+    // Wait for string input
+    ConsoleInString(inStringBuffer, CONSOLE_MAX_CHAR);
 
-        }
-
-    
+    // Get tokens and assign them to arg buffer 
+    token = strtok(inStringBuffer, " ");
+    while (token != NULL && _argIndex < MAX_COMMAND_ARGS) {
+        strcpy(argBuff[_argIndex++], token);
+        token = strtok(NULL, " "); // Get the next substring
     }
+
+    // Search for command name from first argument
+    commIndex = _findCommIndex(argBuff[0]);
+    if( commIndex != -1)
+    {
+        return ConsoleCommArr[commIndex];
+    }
+
     return NULL;
 }
 
 
-bool _addComm(ConsoleComm_t *comm)
-{
-    if( registeredCommands == MAX_COMMANDS - 1)
-    {
-        return false;
-    }
-
-    ConsoleCommArr[registeredCommands++] = comm;
-    return true;
-}
-
-int8_t _findComm(char commName[])
+int8_t _findCommIndex(char commName[])
 {
     for(uint8_t i = 0; i < registeredCommands; i++)
     {
@@ -138,42 +140,26 @@ int8_t _findComm(char commName[])
     return -1;
 }
 
+void _initArgvBuff(void)
+{
+    for(uint8_t i = 0; i < MAX_COMMAND_ARGS; i++)
+    {
+        argvBuff[i] = argBuff + i;
+    }
+}
+
 void _exeComm(ConsoleComm_t *comm)
 {
     comm->command(argvBuff);
-}
-
-bool _processInput(char input[])
-{
-    int16_t commIndex = 0;
-    uint8_t numArgs = 0;
-    ConsoleComm_t *comm;
-    // populate argv with the command name and arguments
-    numArgs = _tokenizeInput(input);
-
-    // find if the command is in the registered list
-    commIndex = _findComm(argvBuff[0]);
-
-    // If index not found, return;
-    if (commIndex == -1)
-    {
-        return false;
-    }
-
-    comm = ConsoleCommArr[commIndex];
-    if(comm->argumentCount != numArgs)
-    {
-        return false;
-    }
-    
-    _exeComm(comm);
-    return true;
 }
 
 // Global Functions
 void ConsoleInit(UART_HandleTypeDef * ConsoleUart)
 {
     _ConsoleUart = ConsoleUart;
+
+    // Initialize buffers
+    _initArgvBuff();
 
     // Start UART Rx interrupts
     HAL_UART_Receive_IT(_ConsoleUart, &UART_RxChar, sizeof(char)); 
@@ -195,7 +181,10 @@ void ConsoleInit(UART_HandleTypeDef * ConsoleUart)
 char ConsoleInChar(void)
 {
     // Loiter until new character 
-    while(!newChar);
+    while(!newChar)
+    {
+        tx_thread_sleep(IN_CHAR_SLEEP);
+    }
 
     // If delete or backspace, print a backspace
     if(UART_RxChar == DEL || UART_RxChar == BACKSPACE)
@@ -401,12 +390,20 @@ bool ConsolePrint(char message[], ...)
 
 bool ConsoleRegisterComm(ConsoleComm_t * command)
 {
-    return (bool) _addComm(command);
+    if( registeredCommands == MAX_COMMANDS - 1)
+    {
+        return false;
+    }
+
+    ConsoleCommArr[registeredCommands++] = command;
+    return true;
+
 }
 
 void thread_console(ULONG ctx)
 {
     ConsoleComm_t *newCommand = {0};
+    char spaceBuff[COMM_HELP_SPACING] = {0};
 
     ConsoleClear();
     _consoleUnlock();
@@ -414,6 +411,7 @@ void thread_console(ULONG ctx)
     ConsolePrint("Welcome to manticore Serial Console \r\n");
     ConsolePrint("Please select a command: \r\n");
     
+    // Print commands
     for(uint8_t i = 0; i < registeredCommands; i++)
     {
         // Print name 
@@ -429,6 +427,7 @@ void thread_console(ULONG ctx)
         ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
     }
 
+    // Execute commands
     while(true)
     {
         newCommand = _getCommand();
@@ -437,9 +436,13 @@ void thread_console(ULONG ctx)
         {
             ConsolePrint("Invalid Command!");
         }
+        else if ( (_argIndex - 1) != newCommand->argumentCount)
+        {
+            ConsolePrint("Invalid argument Count. %s has %d arguments.", newCommand->name, newCommand->argumentCount);
+        }
         else
         {
-           _exeComm(newCommand); 
+            _exeComm(newCommand);
         }
         
         ConsolePrint("\r\n\r\n");
