@@ -98,7 +98,7 @@ ConsoleComm_t *_getCommand(void)
 {
     char charFilter[] = {SPACE, ENTER};
     char inChar;  
-    char inStringBuffer[CONSOLE_MAX_CHAR];
+    char inStringBuffer[CONSOLE_MAX_CHAR] = {0};
     _argIndex = 0;
     int8_t commIndex = 0;
     char *token;
@@ -227,6 +227,7 @@ void ConsoleInString(char inString[], uint8_t stringMaxLen)
 {
     uint8_t stringIndex = 0;
     char inChar;
+
     while(true)
     {
         inChar = ConsoleInChar(); 
@@ -237,14 +238,14 @@ void ConsoleInString(char inString[], uint8_t stringMaxLen)
             break;
         }   
 
+        // Remove character if backspace
         if(inChar == BACKSPACE && stringIndex > 0)
         {
-            inString[stringIndex] == NULL;
-            stringIndex--;
+            inString[--stringIndex] = NULL;
         }
 
         // Otherwise assign string 
-        else
+        else if(inChar != BACKSPACE)
         {
             inString[stringIndex++] = inChar;
         }
@@ -410,28 +411,28 @@ void thread_console(ULONG ctx)
         
     ConsolePrint("Welcome to manticore Serial Console \r\n");
     ConsolePrint("Please select a command: \r\n");
-    
-    // Print commands
-    for(uint8_t i = 0; i < registeredCommands; i++)
-    {
-        // Print name 
-        ConsolePrint("%s", ConsoleCommArr[i]->name);
 
-        // Right align help
-        for(char j = 0; j < CONSOLE_NAME_MAX_CHAR - strlen(ConsoleCommArr[i]->name); j++ )
+    while(true)
+    { 
+        // Print commands
+        for(uint8_t i = 0; i < registeredCommands; i++)
         {
-            sprintf(spaceBuff + j, " ");
+            // Print name 
+            ConsolePrint("%s", ConsoleCommArr[i]->name);
+
+            // Right align help
+            for(char j = 0; j < CONSOLE_NAME_MAX_CHAR - strlen(ConsoleCommArr[i]->name); j++ )
+            {
+                sprintf(spaceBuff + j, " ");
+            }
+
+            // Print help
+            ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
         }
 
-        // Print help
-        ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
-    }
-
-    // Execute commands
-    while(true)
-    {
+        // Execute commands
         newCommand = _getCommand();
-        ConsolePrint("\r\n\r\n");
+        ConsolePrint("\r\n");
         if(newCommand == NULL)
         {
             ConsolePrint("Invalid Command!");
