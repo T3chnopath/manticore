@@ -23,6 +23,9 @@ static char *argvBuff[MAX_COMMAND_ARGS] = {0};
 static const char unlockString[] = "console";
 static const uint16_t CONSOLE_IN_DELAY = 200;
 static const char ENTER = '\r';
+static const char DEL = 127;
+static const char BACKSPACE = '\b';
+static const char SPACE = ' ';
 
 static bool enableLogging = false;
 
@@ -44,10 +47,6 @@ void thread_console(ULONG ctx);
 
 // Static function Declarations
 
-char _consoleInChar();                                    // [BLOCKING] wait for a single character
-bool _consoleInFilter(char input[], char filterChar);     // [BLOCKING] populate input buff with the serial input. 
-                                                          // terminate if filter char is detected.
-
 void _consoleUnlock(void);                          // [BLOCKING] wait until unlock string is entered
 
 uint8_t _tokenizeInput(char input[]); // Accept the input from terminal and set argv to the tokens. 
@@ -58,73 +57,36 @@ int8_t _findComm(char commName[]);                  // Find command in the commA
 void _exeComm(ConsoleComm_t *comm);                 // Execute command
 bool _processInput(char input[]);                    // tokenize string input and process it if there is a valid command
 
-char _consoleInChar(void)
-{
-    while(!newChar);
-    newChar = false;
-    return UART_RxChar;
-}
-
-bool _consoleInFilter(char input[], char filterChar)
-{
-    uint16_t inputIndex = 0; 
-    uint8_t inputChar = ' ';
-    
-    HAL_StatusTypeDef uartStatus;
-
-    // Populate input until the filter char is detected
-    while (true) 
-    {
-        inputChar = _consoleInChar();
-        ConsolePrint("%c", inputChar);
-
-        if(inputChar != filterChar)
-        {
-            input[inputIndex++] = inputChar;
-        }
-
-        // Break if filter detected
-        if (inputChar == filterChar)
-        {
-            return true;
-        }
-
-        // Break if max characters
-        else if (inputIndex == CONSOLE_MAX_CHAR)
-        {
-            return false; 
-        }
-    };
-}
-
 void _consoleUnlock(void)
 {
     uint8_t len = strlen(unlockString);
     char inBuff[sizeof(unlockString)/sizeof(char)];
-    bool unlock = false;
-    bool validChar = true;
+    bool equalFlag = false;
 
-    while(!unlock)
+    while(true)
     {
         for(uint8_t i = 0; i < len; i++)
         {
-            validChar = _consoleInFilter(inBuff, unlockString[i]);
-
-            // if char is invalid, restart the for loop
-            if(!validChar)
+            inBuff[i] = ConsoleInCharFilter(unlockString, len); 
+            if (unlockString[i] != inBuff[i])
             {
+                equalFlag = false;
                 break;
-            } 
+            }
+            else
+            {
+                equalFlag = true;
+            }
         }
 
-        // if all characters are valid, break out of while loop
-        if(validChar)
+        // If equal flag, perform a strcmp to verify consecutivity
+        if(equalFlag && strcmp(unlockString, inBuff) == 0)
         {
-            enableLogging = true;
-            unlock = true;
+            break;
         }
     }
-    ConsolePrint("\r\n");
+    
+    ConsolePrint("\r\n\r\n"); 
 }
 
 uint8_t _tokenizeInput(char input[])
@@ -177,7 +139,7 @@ void _exeComm(ConsoleComm_t *comm)
 
 bool _processInput(char input[])
 {
-    uint8_t commIndex = 0;
+    int16_t commIndex = 0;
     uint8_t numArgs = 0;
     ConsoleComm_t *comm;
     // populate argv with the command name and arguments
@@ -223,6 +185,121 @@ void ConsoleInit(UART_HandleTypeDef * ConsoleUart)
 
 }
 
+// Char functions
+char ConsoleInChar(void)
+{
+    // Loiter until new character 
+    while(!newChar);
+
+    // If delete or backspace, print a backspace
+    if(UART_RxChar == DEL || UART_RxChar == BACKSPACE)
+    {
+        ConsolePrint("%c", BACKSPACE);
+        ConsolePrint(" ");
+        ConsolePrint("%c", BACKSPACE);
+        UART_RxChar = BACKSPACE;
+    }
+    else
+    {
+        ConsolePrint("%c", UART_RxChar);
+    }
+
+    newChar = false;
+    return UART_RxChar;
+}
+
+char ConsoleInCharFilter(char charFilter[], uint8_t filterSize)
+{
+    char inChar;
+
+    // Wait until input is within the filter 
+    while(true)
+    {
+        inChar = ConsoleInChar();
+
+        for(uint8_t i = 0; i < filterSize; i++)
+        {
+            if(charFilter[i] == inChar)
+            {
+                return inChar;
+            }
+        }
+    }
+}
+
+// Wait for max length or enter key
+void ConsoleInString(char inString[], uint8_t stringMaxLen)
+{
+    uint8_t stringIndex = 0;
+    char inChar;
+    while(true)
+    {
+        inChar = ConsoleInChar(); 
+
+        // Break if ENTER key or if max length reached
+        if(inChar == ENTER || stringIndex == stringMaxLen)
+        {
+            break;
+        }   
+
+        if(inChar == BACKSPACE && stringIndex > 0)
+        {
+            inString[stringIndex] == NULL;
+            stringIndex--;
+        }
+
+        // Otherwise assign string 
+        else
+        {
+            inString[stringIndex++] = inChar;
+        }
+    }
+}
+
+char ConsoleInStringFilter(char inString[], uint8_t stringMaxLen, char charFilter[], uint8_t filterSize)
+{
+    uint8_t stringIndex = 0;
+    char inChar;
+    while(true)
+    {
+        inChar = ConsoleInChar(); 
+
+        // Break if ENTER key or if max length reached
+        if(stringIndex == stringMaxLen)
+        {
+            return NULL;
+        }   
+
+        // return enter if detected (natively filtered)
+        if(inChar == ENTER)
+        {
+            return ENTER;
+        }
+
+        // Process user filters 
+        for(uint8_t i = 0; i < filterSize; i++)
+        {
+            if(charFilter[i] == inChar)
+            {
+                return inChar;
+            }
+        }
+
+        if(inChar == BACKSPACE && stringIndex > 0)
+        {
+            inString[stringIndex] == NULL;
+            stringIndex--;
+        }
+
+        // Otherwise assign string 
+        else
+        {
+            inString[stringIndex++] = inChar;
+        }
+    }
+}
+
+
 bool ConsoleLog(LOG_PRI pri, char message[], ...)
 {
     va_list ap;
@@ -263,6 +340,15 @@ bool ConsoleLog(LOG_PRI pri, char message[], ...)
     ConsolePrint(logBuff);
 
     return true;
+}
+
+void ConsoleClear(void)
+{
+    for(uint8_t i = 0; i < CONSOLE_MAX_CHAR / 4; i++)
+    {
+        ConsolePrint("    ");
+    }
+    ConsolePrint("\r\n");
 }
 
 bool ConsolePrint(char message[], ...)
@@ -316,7 +402,8 @@ void thread_console(ULONG ctx)
 {
     // Wait until unlock command is issued    
     bool validCommand = false;
-    
+
+    ConsoleClear();
     _consoleUnlock();
         
     ConsolePrint("Welcome to manticore Serial Console \r\n");
@@ -337,14 +424,14 @@ void thread_console(ULONG ctx)
         ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
     }
 
-    while(true)
-    {
-        memset(inputBuff, 0, sizeof(inputBuff));
-        _consoleInFilter(inputBuff, ENTER);
-        if(_processInput(inputBuff))
+    // while(true)
+    // {
+    //     memset(inputBuff, 0, sizeof(inputBuff));
+    //     _consoleInFilter(inputBuff, ENTER);
+    //     if(_processInput(inputBuff))
 
-        ConsolePrint("\r\n");
-    }
+    //     ConsolePrint("\r\n");
+    // }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) 
