@@ -24,10 +24,9 @@ typedef struct
     void (*command)(char *argv[]);
 } ConsoleComm_t;
 
-void ConsoleRegisterHandle(UART_HandleTypeDef *ConsoleUart);
+void ConsoleInit(UART_HandleTypeDef *ConsoleUart);
 bool ConsoleLog(LOG_PRI pri, char message[], ...);
 bool ConsolePrint(char message[], ...);
 bool ConsoleRegisterComm(ConsoleComm_t *command);
-void ConsoleMenu(void);
 
 #endif

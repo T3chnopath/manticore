@@ -206,6 +206,12 @@ static void _BSP_UART_Init(void)
 #endif
     HAL_GPIO_Init(UART_TX_Port, &GPIO_InitStruct);
     HAL_GPIO_Init(UART_RX_Port, &GPIO_InitStruct);
+
+    // Rx interrupt
+#ifdef UART3_EN
+    HAL_NVIC_SetPriority(USART3_IRQn, 1, 1);
+    HAL_NVIC_EnableIRQ(USART3_IRQn);
+#endif
 }
 
 static void _BSP_ErrorHandler(void)

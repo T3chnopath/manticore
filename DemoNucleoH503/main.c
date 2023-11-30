@@ -36,7 +36,7 @@ void Test(char *argv[])
 }
 
 static ConsoleComm_t CommHelloWorld = {
-    "Hello World",
+    "HelloWorld",
     "Prints hello world.",
     0,
     HelloWorld,
@@ -92,10 +92,9 @@ void thread_main(ULONG ctx)
     MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
     MCAN_SetEnableIT(MCAN_ENABLE);
 
-    ConsoleRegisterHandle(&ConsoleUart);
+    ConsoleInit(&ConsoleUart);
     ConsoleRegisterComm(&CommHelloWorld);
     ConsoleRegisterComm(&CommTest);
-    ConsoleMenu();
     
     while( true )
     {
