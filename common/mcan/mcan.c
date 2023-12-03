@@ -2,34 +2,36 @@
 
 #include "stm32h5xx_hal.h"
 
-#ifdef STM32H503
+#if defined(STM32H503)
 #include "stm32h503xx.h"
-#elif STM32H563
+#elif defined(STM32H563)
 #include "stm32h563xx.h"
 #endif
 
 #include "tx_api.h"
 #include "mcan.h"
 
+#define UINT12_MAX 4096
+
 /********** Static Variables and Data Structures ********/
 typedef enum {
-    kMCAN_SHIFT_MessageStamp = 0,
-    kMCAN_SHIFT_Priority = 16,
-    kMCAN_SHIFT_RxDevice = 18,
-    kMCAN_SHIFT_TxDevice = 22,
-    kMCAN_SHIFT_Cat     = 26,
+    kMCAN_SHIFT_Priority  = 27,
+    kMCAN_SHIFT_Cat       = 24,
+    kMCAN_SHIFT_RxDevice  = 18,
+    kMCAN_SHIFT_TxDevice  = 12,
+    kMCAN_SHIFT_TimeStamp = 0,
 } MCAN_ID_SHIFTS;
 
 typedef enum {
-    mMCAN_MessageStamp = 0xFFFF,
-    mMCAN_Priority     =   0x03 , 
-    mMCAN_RxDevice     =   0x0F ,
-    mMCAN_TxDevice     =   0x0F ,
-    kMCAN_Cat         =   0x07 ,
+    mMCAN_Priority  = 0x0003 << kMCAN_SHIFT_Priority, 
+    mMCAN_Cat       = 0x0007 << kMCAN_SHIFT_Cat,
+    mMCAN_RxDevice  = 0x003F << kMCAN_SHIFT_RxDevice,
+    mMCAN_TxDevice  = 0x003F << kMCAN_SHIFT_TxDevice,
+    mMCAN_TimeStamp = 0x0FFF << kMCAN_SHIFT_TimeStamp,
 } MCAN_ID_MASK;
 
 static const uint8_t MCAN_MAX_FILTERS = 2;
-static MCAN_DEV _currentDevice;
+static MCAN_DEV _mcanCurrentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
 static sMCAN_Message* _mcanRxMessage;
@@ -43,7 +45,7 @@ static uint32_t heartbeatPeriod;
 
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
-static bool _MCAN_ConfigFilter( void );
+static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 static uint16_t _MCAN_GetTimestamp( void );
@@ -107,44 +109,41 @@ static bool _MCAN_ConfigInterface( FDCAN_GlobalTypeDef* FDCAN_Instance )
         selection. Assumes Extended CAN2.0B style IDs.
 
     Arguments:
-        currentDevice = current module expecting reception
+        rxDevice = current module expecting reception
 
     Returns:
         True  = succesful config init
         False = config failure 
 *********************************************************************/
-static bool _MCAN_ConfigFilter( void )
+static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
 {
+    uint8_t filterIndex = 0;
     FDCAN_FilterTypeDef sFilterConfig =
     {
         .IdType        = FDCAN_EXTENDED_ID,
         .FilterType    = FDCAN_FILTER_MASK,
         .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
     };
 
     // Config global filters to reject incorrect IDs
     if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
-{
-        return false;
-    }
-
-    // Config first filter for current device 
-    sFilterConfig.FilterIndex = 0;
-    sFilterConfig.FilterID1 = _currentDevice << kMCAN_SHIFT_RxDevice;
-
-    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
     }
 
-    // Config second filter for all devices: 
-    sFilterConfig.FilterIndex = 1;
-    sFilterConfig.FilterID1 = DEV_ALL << kMCAN_SHIFT_RxDevice;
-
-    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
+    // Bitmask to configure selected filters
+    for(MCAN_DEV dev = DEV_POWER; dev <= DEV_DEBUG; dev = dev << 1)
     {
-        return false;
+        if (mcanRxFilter& dev)
+        {
+            sFilterConfig.FilterIndex = filterIndex++;
+            sFilterConfig.FilterID1   = mcanRxFilter << kMCAN_SHIFT_RxDevice;
+
+            if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
+            {
+                return false;
+            }
+        }
     }
 
     return true; 
@@ -165,11 +164,11 @@ static bool _MCAN_ConfigFilter( void )
 ***********************************************************************************/
 static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
-    mcanID->MCAN_TIME_STAMP |= (uIdentifier >> kMCAN_SHIFT_MessageStamp) & mMCAN_MessageStamp;
-    mcanID->MCAN_PRIORITY   |= (uIdentifier >> kMCAN_SHIFT_Priority) & mMCAN_Priority;
-    mcanID->MCAN_RX_Device  |= (uIdentifier >> kMCAN_SHIFT_RxDevice) & mMCAN_RxDevice;
-    mcanID->MCAN_TX_Device  |= (uIdentifier >> kMCAN_SHIFT_TxDevice) & mMCAN_TxDevice;
-    mcanID->MCAN_CAT       |= (uIdentifier >> kMCAN_SHIFT_Cat) & kMCAN_Cat;
+    mcanID->MCAN_PRIORITY  |= (uIdentifier & mMCAN_Priority)  >> kMCAN_SHIFT_Priority;
+    mcanID->MCAN_CAT       |= (uIdentifier & mMCAN_Cat)       >> kMCAN_SHIFT_Cat;
+    mcanID->MCAN_RX_Device |= (uIdentifier & mMCAN_RxDevice)  >> kMCAN_SHIFT_RxDevice;
+    mcanID->MCAN_TX_Device |= (uIdentifier & mMCAN_TxDevice)  >> kMCAN_SHIFT_TxDevice;
+    mcanID->MCAN_TimeStamp |= (uIdentifier & mMCAN_TimeStamp) >> kMCAN_SHIFT_TimeStamp;
 }
 
 /*********************************************************************************
@@ -189,16 +188,16 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
-    *uIdentifier |= (mcanID->MCAN_TIME_STAMP << kMCAN_SHIFT_MessageStamp);
-    *uIdentifier |= (mcanID->MCAN_PRIORITY << kMCAN_SHIFT_Priority);
+    *uIdentifier |= (mcanID->MCAN_PRIORITY  << kMCAN_SHIFT_Priority);
+    *uIdentifier |= (mcanID->MCAN_CAT       << kMCAN_SHIFT_Cat);
     *uIdentifier |= (mcanID->MCAN_RX_Device << kMCAN_SHIFT_RxDevice);
     *uIdentifier |= (mcanID->MCAN_TX_Device << kMCAN_SHIFT_TxDevice);
-    *uIdentifier |= (mcanID->MCAN_CAT << kMCAN_SHIFT_Cat);
+    *uIdentifier |= (mcanID->MCAN_TimeStamp << kMCAN_SHIFT_TimeStamp);
 }
 
 static inline uint16_t _MCAN_GetTimestamp( void )
 {
-    return (HAL_GetTick() / 1000) % UINT16_MAX;
+    return (HAL_GetTick() / 1000) % UINT12_MAX;
 }
 
 
@@ -216,24 +215,24 @@ static inline uint16_t _MCAN_GetTimestamp( void )
 
     Arguments:
         FDCAN_Instance = pointer to FDCAN_GlobalTypeDef instance
-        currentDevice  = current module expecting reception
+        rxDevice       = current module expecting reception
         sMCAN_Message  = pointer to MCAN Rx message buffer for reception
 
     Returns:
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMCAN_Message* mcanRxMessage )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter, sMCAN_Message* mcanRxMessage )
 {
-    _currentDevice = currentDevice;
     _mcanRxMessage = mcanRxMessage;
+    _mcanCurrentDevice = mcanCurrentDevice;
 
     if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
     {
         return false;
     }
 
-   if ( !_MCAN_ConfigFilter() )
+   if ( !_MCAN_ConfigFilter( mcanRxFilter ) )
     {
         return false;
     }
@@ -330,11 +329,11 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_
 {
     int status = 0;
     sMCAN_ID mcanID = {
-            .MCAN_CAT = mcanType, 
-            .MCAN_TX_Device = _currentDevice,
-            .MCAN_RX_Device = mcanRxDevice,
             .MCAN_PRIORITY = mcanPri,
-            .MCAN_TIME_STAMP = _MCAN_GetTimestamp(),
+            .MCAN_CAT = mcanType, 
+            .MCAN_RX_Device = mcanRxDevice,
+            .MCAN_TX_Device = _mcanCurrentDevice,
+            .MCAN_TimeStamp = _MCAN_GetTimestamp(),
     };
     
     // Interpret 32 bit idenfitier from MCAN message struct ID
@@ -460,7 +459,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
 
         // Update time stamp to be time of reception
-        _mcanRxMessage->mcanID.MCAN_TIME_STAMP = _MCAN_GetTimestamp();
+        _mcanRxMessage->mcanID.MCAN_TimeStamp= _MCAN_GetTimestamp();
 
         MCAN_Rx_Handler();
     }
@@ -471,7 +470,7 @@ void thread_heartbeat(ULONG ctx)
 {
     while( true )
     {
-       MCAN_TX( MCAN_DEBUG, HEARTBEAT, DEV_HEARTBEAT, heartbeatDataBuf);
+       MCAN_TX( MCAN_DEBUG, HEARTBEAT, _mcanCurrentDevice, heartbeatDataBuf);
        tx_thread_sleep(heartbeatPeriod);
     }
 }

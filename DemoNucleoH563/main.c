@@ -19,7 +19,7 @@ int main(void)
     /* Initialize BSP */
     BSP_Init();
 
-    MCAN_Init( FDCAN2, DEV_MAIN_COMPUTE, &mcanRxMessage );
+    MCAN_Init( FDCAN2, DEV_MAIN_COMPUTE, DEV_MAIN_COMPUTE, &mcanRxMessage );
 
     tx_kernel_enter();
    }
@@ -69,7 +69,7 @@ void thread_main(ULONG ctx)
 
 void MCAN_Rx_Handler( void )
 {
-    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_MAIN_COMPUTE || mcanRxMessage.mcanID.MCAN_RX_Device == DEV_ALL )
+    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_MAIN_COMPUTE )
     {
         heartbeatFlag = (bool) mcanRxMessage.mcanData[0];
     } 
