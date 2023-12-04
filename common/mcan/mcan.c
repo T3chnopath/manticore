@@ -6,10 +6,32 @@
 #include "stm32h503xx.h"
 #elif defined(STM32H563)
 #include "stm32h563xx.h"
+#else
+    #error "No STMH5 series defined!"
 #endif
 
 #include "tx_api.h"
 #include "mcan.h"
+
+// Define current device for use in CAN tx
+#if defined(DEMO_NUCLEO_H503)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEBUG;
+#elif defined(DEMO_NUCLEO_H563)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEBUG;
+#elif defined(POWER_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_POWER;
+#elif defined(COMPUTE_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MAIN_COMPUTE;
+#elif defined(DEPLOYMENT_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEPLOYMENT;
+#elif defined(MIO_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MIO;
+#elif defined(MTUSC)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MTUSC;
+
+#else
+    #error "No valid MCAN device defined!"
+#endif
 
 #define UINT12_MAX 4096
 #define MCAN_QUEUE_SIZE 20
@@ -46,7 +68,6 @@ typedef struct {
 
 /********** Static Variables ********/
 static const uint8_t MCAN_MAX_FILTERS = 2;
-static MCAN_DEV _mcanCurrentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
 static uint8_t* heartbeatDataBuf;
@@ -170,6 +191,15 @@ static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
 
     // Config global filters to reject incorrect IDs
     if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
+    {
+        return false;
+    }
+
+    // Configure current device
+    sFilterConfig.FilterIndex = filterIndex++;
+    sFilterConfig.FilterID1   = _mcanCurrentDevice << kMCAN_SHIFT_RxDevice;
+
+    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
     }
@@ -358,10 +388,8 @@ sMCAN_Message _MCAN_PriDequeue(void) {
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter )
 {
-    _mcanCurrentDevice = mcanCurrentDevice;
-
     if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
     {
         return false;
@@ -458,7 +486,7 @@ __weak void MCAN_Rx_Handler()
 }
 
 /*********************************************************************************
-    Name: MCAN_TX
+    Name: MCAN_TX_Verbose
     
     Description:
         Transmit an MCAN message, given an MCAN message struct. Struct timestamp
@@ -472,14 +500,14 @@ __weak void MCAN_Rx_Handler()
         True  = successful transmission of message
         False = failed tranmission of message
 ***********************************************************************************/
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
+bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
     int status = 0;
     sMCAN_ID mcanID = {
             .MCAN_PRIORITY = mcanPri,
             .MCAN_CAT = mcanType, 
             .MCAN_RX_Device = mcanRxDevice,
-            .MCAN_TX_Device = _mcanCurrentDevice,
+            .MCAN_TX_Device = mcanTxDevice,
             .MCAN_TimeStamp = _MCAN_GetTimestamp(),
     };
     
@@ -513,6 +541,10 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_
     return false;
 }
 
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] )
+{
+    return (bool) MCAN_TX_Verbose(mcanPri, mcanType, _mcanCurrentDevice, mcanRxDevice, mcanData );
+}
 
 /********************************************************************************
  //TODO DOCUMENTATION UPDATE
@@ -616,10 +648,13 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 /***************************** Threads *****************************/
 void thread_heartbeat(ULONG ctx)
 {
+    // Select all but current device 
+    MCAN_DEV rxDevices = ALL_DEVICES & ~_mcanCurrentDevice;
+
     while( true )
     {
-       MCAN_TX( MCAN_DEBUG, HEARTBEAT, _mcanCurrentDevice, heartbeatDataBuf);
-       tx_thread_sleep(heartbeatPeriod);
+        MCAN_TX( MCAN_DEBUG, HEARTBEAT, rxDevices, heartbeatDataBuf);
+        tx_thread_sleep(heartbeatPeriod);
     }
 }
 

@@ -28,13 +28,14 @@ typedef enum {
 } MCAN_CAT;
 
 typedef enum {
-    DEV_POWER        = 1 << 0,
-    DEV_MAIN_COMPUTE = 1 << 1,
-    DEV_DEPLOYMENT   = 1 << 2,
-    DEV_MIO          = 1 << 3,
-    DEV_MTUSC        = 1 << 4,
-    DEV_DEBUG        = 1 << 5,
+    DEV_POWER      = 1 << 0,
+    DEV_COMPUTE    = 1 << 1,
+    DEV_DEPLOYMENT = 1 << 2,
+    DEV_MIO        = 1 << 3,
+    DEV_MTUSC      = 1 << 4,
+    DEV_DEBUG      = 1 << 5,
 } MCAN_DEV;
+static const MCAN_DEV ALL_DEVICES = 0x3F;
 
 typedef struct{
     MCAN_PRI MCAN_PRIORITY;
@@ -51,13 +52,13 @@ typedef struct
 } sMCAN_Message;
 
 // User can bitwise OR to configure device filter.
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter);
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter);
 
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
 __weak void MCAN_RX_Handler( sMCAN_Message mcanRxMessage ); // Called by ISR 
 
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 
 void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
