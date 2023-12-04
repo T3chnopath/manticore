@@ -12,8 +12,10 @@
 #include "mcan.h"
 
 #define UINT12_MAX 4096
+#define MCAN_QUEUE_SIZE 20
+#define MCAN_PRI_COUNT 4
 
-/********** Static Variables and Data Structures ********/
+/********** Static Data Structures ********/
 typedef enum {
     kMCAN_SHIFT_Priority  = 27,
     kMCAN_SHIFT_Cat       = 24,
@@ -30,6 +32,19 @@ typedef enum {
     mMCAN_TimeStamp = 0x0FFF << kMCAN_SHIFT_TimeStamp,
 } MCAN_ID_MASK;
 
+typedef struct {
+    sMCAN_Message array[MCAN_QUEUE_SIZE];
+    uint8_t front;
+    uint8_t rear;
+    uint8_t size;
+} MCAN_Queue;
+
+// Priority queue holds 4 buckets organized by priority
+typedef struct {
+    MCAN_Queue queues[MCAN_PRI_COUNT];
+} MCAN_PriQueue;
+
+/********** Static Variables ********/
 static const uint8_t MCAN_MAX_FILTERS = 2;
 static MCAN_DEV _mcanCurrentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
@@ -37,6 +52,10 @@ static TX_MUTEX mcanTxMutex;
 static sMCAN_Message* _mcanRxMessage;
 static uint8_t* heartbeatDataBuf;
 
+// Queue Variables
+static MCAN_PriQueue _mcanPriQueue;
+
+// Thread Variables
 #define THREAD_HEARTBEAT_STACK_SIZE 256
 static TX_THREAD stThreadHeartbeat;
 static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
@@ -49,6 +68,19 @@ static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter );
 static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 static uint16_t _MCAN_GetTimestamp( void );
+
+// Queue Functions
+void _MCAN_QueueInit(MCAN_Queue *q);
+void _MCAN_QueueEmpty(MCAN_Queue *q);
+void _MCAN_QueueFull(MCAN_Queue *q);
+void _MCAN_Enqueue(MCAN_Queue, sMCAN_Message message);
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *q);
+
+void _MCAN_PriQueueInit(void);
+void _MCAN_PriEnqueue(sMCAN_Message mcanMessage);
+sMCAN_Message _MCAN_Dequeue(void);
+
+// Threads 
 static void thread_heartbeat( ULONG ctx );
 
 
@@ -200,6 +232,88 @@ static inline uint16_t _MCAN_GetTimestamp( void )
     return (HAL_GetTick() / 1000) % UINT12_MAX;
 }
 
+
+// Queue functions
+
+// Initialize the queue
+void _MCAN_QueueInit(MCAN_Queue *q) {
+    q->front = 0;
+    q->rear = -1;
+    q->size = 0;
+}
+
+// Check if the queue is empty
+bool _MCAN_QueueEmpty(MCAN_Queue *q) {
+    return q->size == 0;
+}
+
+// Check if the queue is full
+bool _MCAN_QueueFull(MCAN_Queue *q) {
+    return q->size == MCAN_QUEUE_SIZE;
+}
+
+// Enqueue an element
+void _MCAN_Enqueue(MCAN_Queue *q, sMCAN_Message message) {
+    if (MCAN_QueueFull(q)) {
+        return;
+    }
+    
+    q->array[q->rear] = message;
+    q->rear = (q->rear + 1) % MCAN_QUEUE_SIZE;
+    q->size++;
+}
+
+// Dequeue an element
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *q) {
+    if (MCAN_QueueEmpty(q)) {
+        sMCAN_Message empty = {0}; // Initialize to your default empty value
+        return empty;
+    }
+    sMCAN_Message element = q->array[q->front];
+    q->front = (q->front + 1) % MCAN_QUEUE_SIZE;
+    q->size--;
+    return element;
+}
+
+
+// Priority Queue Functions
+void _MCAN_PriQueueInit(void) {
+    for (int i = 0; i < MCAN_PRI_COUNT; i++) {
+        _MCAN_QueueInit(&_mcanPriQueue->queues[i]);
+    }
+}
+
+// Enqueue an element into the correct queue based on priority
+void _MCAN_PriEnqueue(sMCAN_Message message) {
+    MCAN_PRI pri = message.mcanID.MCAN_PRIORITY; 
+
+    // Check priority bounds 
+    if (pri < MCAN_EMERGENCY || pri > MCAN_DEBUG) 
+    {
+        return; // Invalid priority
+    }
+
+    // Insert message into appropriate queue 
+    _MCAN_Enqueue(_mcanPriQueue->queues[pri], message);
+}
+
+// Dequeue an element, starting from the highest priority
+sMCAN_Message _MCAN_PriDequeue(void) {
+
+    // Iterate through queues in order of priority 
+    for (uint8_t i = 0; i < MCAN_PRI_COUNT; i++) 
+    {
+        // If queue is not empty, return
+        if (!MCAN_QueueEmpty(_mcanPriQueue->queues[i])) 
+        {
+            return MCAN_Dequeue(_mcanPriQueue->queues[i]);
+        }
+    }
+
+    // If all queues are empty, return
+    sMCAN_Message empty = {0}; 
+    return empty;
+}
 
 
 /***************************** Public Function Definitions *****************************/
@@ -449,19 +563,20 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         /* Reception Error */
         }
 
-        // Enable interrupts
+        // Insert ID and timestamp into the message
+        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
+        _mcanRxMessage->mcanID.MCAN_TimeStamp= _MCAN_GetTimestamp();
+
+        // Add message to queue
+        _MCAN_PriEnqueue(_mcanRxMessage);
+
+        // Signal queue processing thread
+
+        // Enable interrupts to receive new messages
         if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
         {
         /* Notification Error */
         }
-
-        // Interpret ID for MCAN struct from uint32 identifier
-        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
-
-        // Update time stamp to be time of reception
-        _mcanRxMessage->mcanID.MCAN_TimeStamp= _MCAN_GetTimestamp();
-
-        MCAN_Rx_Handler();
     }
 }
 
