@@ -50,12 +50,11 @@ typedef struct
     uint8_t mcanData[64];
 } sMCAN_Message;
 
-// sMCAN_Message struct, provided by the caller, is populated with Rx content upon ISR firing.
 // User can bitwise OR to configure device filter.
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter, sMCAN_Message *mcanRxMessage);
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter);
 
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
-__weak void MCAN_RX_Handler( void ); // Called by ISR 
+__weak void MCAN_RX_Handler( sMCAN_Message mcanRxMessage ); // Called by ISR 
 
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );

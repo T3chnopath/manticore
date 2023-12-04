@@ -49,7 +49,6 @@ static const uint8_t MCAN_MAX_FILTERS = 2;
 static MCAN_DEV _mcanCurrentDevice;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
-static sMCAN_Message* _mcanRxMessage;
 static uint8_t* heartbeatDataBuf;
 
 // Queue Variables
@@ -61,6 +60,16 @@ static TX_THREAD stThreadHeartbeat;
 static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
 static uint32_t heartbeatPeriod;
 
+#define THREAD_HEARTBEAT_STACK_SIZE 256
+static TX_THREAD stThreadHeartbeat;
+static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
+static uint32_t heartbeatPeriod;
+
+#define THREAD_QUEUE_CONSUMER_STACK_SIZE 4096
+static TX_THREAD stThreadQueueConsumer;
+static uint8_t auThreadQueueConsumerStack[THREAD_QUEUE_CONSUMER_STACK_SIZE];
+static const uint8_t uThreadConsumerDelay = 10;
+
 
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
@@ -70,18 +79,20 @@ static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcan
 static uint16_t _MCAN_GetTimestamp( void );
 
 // Queue Functions
-void _MCAN_QueueInit(MCAN_Queue *q);
-void _MCAN_QueueEmpty(MCAN_Queue *q);
-void _MCAN_QueueFull(MCAN_Queue *q);
-void _MCAN_Enqueue(MCAN_Queue, sMCAN_Message message);
-sMCAN_Message _MCAN_Dequeue(MCAN_Queue *q);
+void _MCAN_QueueInit( MCAN_Queue *queue);
+bool _MCAN_QueueEmpty( MCAN_Queue *queue);
+bool _MCAN_QueueFull( MCAN_Queue *queue);
+void _MCAN_Enqueue( MCAN_Queue *queue, sMCAN_Message message);
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *queue);
 
 void _MCAN_PriQueueInit(void);
+bool _MCAN_PriQueueEmpty(void);
 void _MCAN_PriEnqueue(sMCAN_Message mcanMessage);
-sMCAN_Message _MCAN_Dequeue(void);
+sMCAN_Message _MCAN_PriDequeue(void);
 
 // Threads 
 static void thread_heartbeat( ULONG ctx );
+static void thread_queue_consumer( ULONG ctx);
 
 
 /***************************** Static Function Definitions *****************************/
@@ -236,42 +247,44 @@ static inline uint16_t _MCAN_GetTimestamp( void )
 // Queue functions
 
 // Initialize the queue
-void _MCAN_QueueInit(MCAN_Queue *q) {
-    q->front = 0;
-    q->rear = -1;
-    q->size = 0;
+void _MCAN_QueueInit(MCAN_Queue *queue) {
+    queue->front = 0;
+    queue->rear  = 0;
+    queue->size  = 0;
 }
 
 // Check if the queue is empty
-bool _MCAN_QueueEmpty(MCAN_Queue *q) {
-    return q->size == 0;
+bool _MCAN_QueueEmpty(MCAN_Queue *queue) {
+    return queue->size == 0;
 }
 
 // Check if the queue is full
-bool _MCAN_QueueFull(MCAN_Queue *q) {
-    return q->size == MCAN_QUEUE_SIZE;
+bool _MCAN_QueueFull(MCAN_Queue *queue) {
+    return queue->size == MCAN_QUEUE_SIZE;
 }
 
 // Enqueue an element
-void _MCAN_Enqueue(MCAN_Queue *q, sMCAN_Message message) {
-    if (MCAN_QueueFull(q)) {
+void _MCAN_Enqueue(MCAN_Queue *queue, sMCAN_Message message) {
+    if (_MCAN_QueueFull(queue)) {
         return;
     }
     
-    q->array[q->rear] = message;
-    q->rear = (q->rear + 1) % MCAN_QUEUE_SIZE;
-    q->size++;
+    queue->array[queue->rear] = message;
+    queue->rear = (queue->rear + 1) % MCAN_QUEUE_SIZE;
+    queue->size++;
 }
 
 // Dequeue an element
-sMCAN_Message _MCAN_Dequeue(MCAN_Queue *q) {
-    if (MCAN_QueueEmpty(q)) {
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *queue) {
+    if (_MCAN_QueueEmpty(queue)) {
         sMCAN_Message empty = {0}; // Initialize to your default empty value
         return empty;
     }
-    sMCAN_Message element = q->array[q->front];
-    q->front = (q->front + 1) % MCAN_QUEUE_SIZE;
-    q->size--;
+    
+    // Element equals front of the queue
+    sMCAN_Message element = queue->array[queue->front];
+    queue->front = (queue->front + 1) % MCAN_QUEUE_SIZE;
+    queue->size--;
     return element;
 }
 
@@ -279,22 +292,32 @@ sMCAN_Message _MCAN_Dequeue(MCAN_Queue *q) {
 // Priority Queue Functions
 void _MCAN_PriQueueInit(void) {
     for (int i = 0; i < MCAN_PRI_COUNT; i++) {
-        _MCAN_QueueInit(&_mcanPriQueue->queues[i]);
+        _MCAN_QueueInit(&_mcanPriQueue.queues[i]);
     }
+}
+
+// Check if the priority queue is empty
+bool _MCAN_PriQueueEmpty(void) {
+
+    // Iterate through all queues to check if they are rempty
+    for(uint8_t i = 0; i < MCAN_PRI_COUNT; i++)
+    {
+        if( !_MCAN_QueueEmpty(&_mcanPriQueue.queues[i]) )
+        {
+            return false;
+        }
+    } 
+
+    // return true if all are empty
+    return true;
 }
 
 // Enqueue an element into the correct queue based on priority
 void _MCAN_PriEnqueue(sMCAN_Message message) {
-    MCAN_PRI pri = message.mcanID.MCAN_PRIORITY; 
-
-    // Check priority bounds 
-    if (pri < MCAN_EMERGENCY || pri > MCAN_DEBUG) 
-    {
-        return; // Invalid priority
-    }
 
     // Insert message into appropriate queue 
-    _MCAN_Enqueue(_mcanPriQueue->queues[pri], message);
+    MCAN_PRI pri = message.mcanID.MCAN_PRIORITY; 
+    _MCAN_Enqueue(&_mcanPriQueue.queues[pri], message);
 }
 
 // Dequeue an element, starting from the highest priority
@@ -304,9 +327,9 @@ sMCAN_Message _MCAN_PriDequeue(void) {
     for (uint8_t i = 0; i < MCAN_PRI_COUNT; i++) 
     {
         // If queue is not empty, return
-        if (!MCAN_QueueEmpty(_mcanPriQueue->queues[i])) 
+        if (!_MCAN_QueueEmpty(&_mcanPriQueue.queues[i])) 
         {
-            return MCAN_Dequeue(_mcanPriQueue->queues[i]);
+            return _MCAN_Dequeue(&_mcanPriQueue.queues[i]);
         }
     }
 
@@ -330,15 +353,13 @@ sMCAN_Message _MCAN_PriDequeue(void) {
     Arguments:
         FDCAN_Instance = pointer to FDCAN_GlobalTypeDef instance
         rxDevice       = current module expecting reception
-        sMCAN_Message  = pointer to MCAN Rx message buffer for reception
 
     Returns:
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter, sMCAN_Message* mcanRxMessage )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice, MCAN_DEV mcanRxFilter )
 {
-    _mcanRxMessage = mcanRxMessage;
     _mcanCurrentDevice = mcanCurrentDevice;
 
     if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
@@ -346,10 +367,22 @@ bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanCurrentDevice,
         return false;
     }
 
-   if ( !_MCAN_ConfigFilter( mcanRxFilter ) )
+    if ( !_MCAN_ConfigFilter( mcanRxFilter ) )
     {
         return false;
     }
+
+    // Start consumer thread
+    tx_thread_create( &stThreadQueueConsumer, 
+        "thread_queue_consumer", 
+        thread_queue_consumer, 
+        0, 
+        auThreadQueueConsumerStack, 
+        THREAD_QUEUE_CONSUMER_STACK_SIZE, 
+        1,
+        1, 
+        0, 
+        TX_AUTO_START);
 
    return true;
 }
@@ -553,24 +586,24 @@ FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
 ***********************************************************************************/
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
+    sMCAN_Message rxMessage = {0};
+
     // Allocate Rx Header to be populated with message data
-    FDCAN_RxHeaderTypeDef _RxHeader = { 0 };
+    FDCAN_RxHeaderTypeDef rxHeader = { 0 };
     if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
     {
         // Populate header and MCAN data 
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_RxHeader, _mcanRxMessage->mcanData ) != HAL_OK)
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxHeader, rxMessage.mcanData ) != HAL_OK)
         {
         /* Reception Error */
         }
 
         // Insert ID and timestamp into the message
-        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
-        _mcanRxMessage->mcanID.MCAN_TimeStamp= _MCAN_GetTimestamp();
+        _MCAN_Conv_Uint32_To_ID(rxHeader.Identifier, &rxMessage.mcanID);
+        rxMessage.mcanID.MCAN_TimeStamp = _MCAN_GetTimestamp();
 
         // Add message to queue
-        _MCAN_PriEnqueue(_mcanRxMessage);
-
-        // Signal queue processing thread
+        _MCAN_PriEnqueue(rxMessage);
 
         // Enable interrupts to receive new messages
         if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
@@ -587,5 +620,28 @@ void thread_heartbeat(ULONG ctx)
     {
        MCAN_TX( MCAN_DEBUG, HEARTBEAT, _mcanCurrentDevice, heartbeatDataBuf);
        tx_thread_sleep(heartbeatPeriod);
+    }
+}
+
+void thread_queue_consumer(ULONG ctx)
+{
+    static const sMCAN_Message mcanRxEmptyMessage = {0};
+    sMCAN_Message mcanRxMessage = {0};
+
+    while(true)
+    {
+        // Check if there are items in the queue 
+        if(!_MCAN_PriQueueEmpty())
+        {
+            
+            // If message is not empty, call handler
+            mcanRxMessage = _MCAN_PriDequeue();
+            if(memcmp(&mcanRxEmptyMessage, &mcanRxMessage, sizeof(sMCAN_Message)) == 0)
+            {
+                MCAN_Rx_Handler(mcanRxMessage);
+            }
+
+        }
+        tx_thread_sleep(uThreadConsumerDelay);
     }
 }
