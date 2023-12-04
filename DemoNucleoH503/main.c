@@ -17,7 +17,6 @@ static uint8_t auThreadBlinkStack[THREAD_BLINK_STACK_SIZE];
 static const uint16_t THREAD_BLINK_DELAY_MS = 1000;
 void thread_blink(ULONG ctx);
 
-static sMCAN_Message mcanRxMessage = { 0 };
 static const uint16_t HEARTBEAT_DELAY_MS = 1000;
 static uint8_t heartbeatData[] = {0xDE, 0xCA, 0xFF, 0xC0, 0xFF, 0xEE, 0xCA, 0xFE};
 static bool heartbeatFlag = false;
@@ -89,7 +88,7 @@ void thread_main(ULONG ctx)
     BSP_Init();
 
     // Init App Layer
-    MCAN_Init( FDCAN1, DEV_MAIN_COMPUTE, &mcanRxMessage );
+    MCAN_Init( FDCAN1, DEV_DEPLOYMENT);
     MCAN_SetEnableIT(MCAN_ENABLE);
 
     ConsoleInit(&ConsoleUart);
@@ -128,9 +127,9 @@ void thread_blink(ULONG ctx)
     }
 }
 
-void MCAN_Rx_Handler( void )
+void MCAN_Rx_Handler( sMCAN_Message mcanRxMessage )
 {
-    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_DEPLOYMENT || mcanRxMessage.mcanID.MCAN_RX_Device == DEV_ALL )
+    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_DEPLOYMENT )
     {
         heartbeatFlag = (bool) mcanRxMessage.mcanData[0];
     } 
