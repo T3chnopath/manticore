@@ -88,12 +88,12 @@ void thread_main(ULONG ctx)
     BSP_Init();
 
     // Init App Layer
-    MCAN_Init( FDCAN1, DEV_DEPLOYMENT);
+    MCAN_Init( FDCAN1, DEV_DEBUG);
     MCAN_SetEnableIT(MCAN_ENABLE);
 
-    ConsoleInit(&ConsoleUart);
-    ConsoleRegisterComm(&CommHelloWorld);
-    ConsoleRegisterComm(&CommTest);
+    // ConsoleInit(&ConsoleUart);
+    // ConsoleRegisterComm(&CommHelloWorld);
+    // ConsoleRegisterComm(&CommTest);
     
     while( true )
     {

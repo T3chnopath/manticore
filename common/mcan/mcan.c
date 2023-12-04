@@ -207,7 +207,7 @@ static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
     // Bitmask to configure selected filters
     for(MCAN_DEV dev = DEV_POWER; dev <= DEV_DEBUG; dev = dev << 1)
     {
-        if (mcanRxFilter& dev)
+        if ( (mcanRxFilter & dev) && dev != _mcanCurrentDevice )
         {
             sFilterConfig.FilterIndex = filterIndex++;
             sFilterConfig.FilterID1   = mcanRxFilter << kMCAN_SHIFT_RxDevice;
