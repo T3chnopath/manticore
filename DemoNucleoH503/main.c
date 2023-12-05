@@ -98,8 +98,6 @@ void thread_blink(ULONG ctx)
     {
         HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
         tx_thread_sleep(THREAD_BLINK_DELAY_MS);
-        uint8_t mcanData[8] = {0, 1 , 2, 3, 4, 5, 6 ,7};
-        MCAN_TX(PRI_DEBUG, CAT_DEBUG, DEV_MIO, mcanData);
     }
 }
 
