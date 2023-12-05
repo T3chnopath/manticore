@@ -4,8 +4,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "stm32h5xx_hal.h"
+#include "native_commands.h"
 
-#define CONSOLE_NAME_MAX_CHAR 15
+#define CONSOLE_NAME_MAX_CHAR 25
 #define CONSOLE_HELP_MAX_CHAR 50
 
 typedef enum

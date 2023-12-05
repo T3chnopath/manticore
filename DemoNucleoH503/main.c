@@ -24,30 +24,6 @@ static bool heartbeatFlag = false;
 // Serial Console Testing
 extern UART_HandleTypeDef ConsoleUart;
 
-void HelloWorld(char *argv[])
-{
-    ConsolePrint("Hello world!");
-}
-
-void Test(char *argv[])
-{
-    ConsolePrint("This is a test!");
-}
-
-static ConsoleComm_t CommHelloWorld = {
-    "HelloWorld",
-    "Prints hello world.",
-    0,
-    HelloWorld,
-};
-
-static ConsoleComm_t CommTest = {
-    "Test",
-    "This is a test",
-    0,
-    Test,
-};
-
 int main(void)
 {
        tx_kernel_enter();
@@ -88,12 +64,10 @@ void thread_main(ULONG ctx)
     BSP_Init();
 
     // Init App Layer
-    MCAN_Init( FDCAN1, DEV_DEBUG);
+    MCAN_Init( FDCAN1, DEV_ALL);
     MCAN_SetEnableIT(MCAN_ENABLE);
 
-    // ConsoleInit(&ConsoleUart);
-    // ConsoleRegisterComm(&CommHelloWorld);
-    // ConsoleRegisterComm(&CommTest);
+    ConsoleInit(&ConsoleUart);
     
     while( true )
     {

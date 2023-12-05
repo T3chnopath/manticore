@@ -4,6 +4,7 @@
 #include <stdarg.h>
 
 #include "console.h"
+#include "native_commands.h"
 #include "stm32h5xx_hal.h"
 #include "tx_api.h"
 
@@ -27,11 +28,9 @@ static char argBuff[MAX_COMMAND_ARGS][ARG_STRING_BUFF_SIZE] = {0};
 static uint8_t _argIndex = 0;
 
 static const char unlockString[] = "console";
-static const uint16_t CONSOLE_IN_DELAY = 200;
 static const char ENTER = '\r';
 static const char DEL = 127;
 static const char BACKSPACE = '\b';
-static const char SPACE = ' ';
 static const uint8_t IN_CHAR_SLEEP = 10;
 
 static bool enableLogging = false;
@@ -39,13 +38,10 @@ static bool enableLogging = false;
 static volatile char UART_RxChar;
 static volatile bool newChar = false;
 
-static char _argStringBuff[ARG_STRING_BUFF_SIZE] = {0};
-
 // Console Thread
-#define THREAD_CONSOLE_STACK_SIZE 2048
+#define THREAD_CONSOLE_STACK_SIZE 4096
 static TX_THREAD stThreadConsole;
 static uint8_t auThreadConsoleStack[THREAD_CONSOLE_STACK_SIZE];
-static const uint16_t THREAD_CONSOLE_DELAY_MS = 10;
 void thread_console(ULONG ctx);
 
 
@@ -96,8 +92,6 @@ void _consoleUnlock(void)
 
 ConsoleComm_t *_getCommand(void)
 {
-    char charFilter[] = {SPACE, ENTER};
-    char inChar;  
     char inStringBuffer[CONSOLE_MAX_CHAR] = {0};
     _argIndex = 0;
     int8_t commIndex = 0;
@@ -175,6 +169,7 @@ void ConsoleInit(UART_HandleTypeDef * ConsoleUart)
         0, 
         TX_AUTO_START);
 
+    ConsoleRegisterNativeCommands();
 }
 
 // Char functions
@@ -241,7 +236,7 @@ void ConsoleInString(char inString[], uint8_t stringMaxLen)
         // Remove character if backspace
         if(inChar == BACKSPACE && stringIndex > 0)
         {
-            inString[--stringIndex] = NULL;
+            inString[--stringIndex] = (char) NULL;
         }
 
         // Otherwise assign string 
@@ -263,7 +258,7 @@ char ConsoleInStringFilter(char inString[], uint8_t stringMaxLen, char charFilte
         // Break if ENTER key or if max length reached
         if(stringIndex == stringMaxLen)
         {
-            return NULL;
+            return (char) NULL;
         }   
 
         // return enter if detected (natively filtered)
@@ -283,7 +278,7 @@ char ConsoleInStringFilter(char inString[], uint8_t stringMaxLen, char charFilte
 
         if(inChar == BACKSPACE && stringIndex > 0)
         {
-            inString[stringIndex] == NULL;
+            inString[stringIndex] == (char) NULL;
             stringIndex--;
         }
 
@@ -409,12 +404,12 @@ void thread_console(ULONG ctx)
     ConsoleClear();
     _consoleUnlock();
         
-    ConsolePrint("Welcome to manticore Serial Console \r\n");
-    ConsolePrint("Please select a command: \r\n");
+    ConsolePrint("Welcome to manticore Serial Console \r\n\r\n");
 
     while(true)
     { 
         // Print commands
+        ConsolePrint("Registered Commands \r\n");
         for(uint8_t i = 0; i < registeredCommands; i++)
         {
             // Print name 
@@ -429,10 +424,11 @@ void thread_console(ULONG ctx)
             // Print help
             ConsolePrint("%s    %s \r\n", spaceBuff, ConsoleCommArr[i]->help);
         }
+        ConsolePrint("\r\n");
 
         // Execute commands
         newCommand = _getCommand();
-        ConsolePrint("\r\n");
+        ConsolePrint("\r\n\r\n");
         if(newCommand == NULL)
         {
             ConsolePrint("Invalid Command!");

@@ -67,7 +67,7 @@ typedef struct {
 } MCAN_PriQueue;
 
 /********** Static Variables ********/
-static const uint8_t MCAN_MAX_FILTERS = 2;
+static const uint8_t MCAN_MAX_FILTERS = 10;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
 static uint8_t* heartbeatDataBuf;
@@ -95,7 +95,7 @@ static const uint8_t uThreadConsumerDelay = 10;
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
 static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter );
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 static uint16_t _MCAN_GetTimestamp( void );
 
@@ -245,7 +245,7 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
 }
 
 /*********************************************************************************
-    Name: _MCAN_Conv_ID_To_Uint32
+    Name: MCAN_Conv_ID_To_Uint32
     
     Description:
         Helper to convert MCAN identifiers to uint32 style HAL identifiers,
@@ -258,7 +258,7 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
     Returns:
         None
 ***********************************************************************************/
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
     *uIdentifier |= (mcanID->MCAN_PRIORITY  << kMCAN_SHIFT_Priority);
@@ -267,6 +267,111 @@ static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentif
     *uIdentifier |= (mcanID->MCAN_TX_Device << kMCAN_SHIFT_TxDevice);
     *uIdentifier |= (mcanID->MCAN_TimeStamp << kMCAN_SHIFT_TimeStamp);
 }
+const char * MCAN_Pri_String( MCAN_PRI priority )
+{
+    static const char acPriEmergency[] = "PRI_EMERGENCY";
+    static const char acPriError[] = "PRI_ERROR";
+    static const char acPriWarning[] = "PRI_WARNING";
+    static const char acPriDebug[] = "PRI_DEBUG";
+    static const char acPriUnknown[] = "?????????????";
+
+    switch(priority)
+    {
+        case MCAN_EMERGENCY:
+            return acPriEmergency;
+        
+        case MCAN_ERROR:
+            return acPriError;
+
+        case MCAN_WARNING:
+            return acPriWarning;
+
+        case MCAN_DEBUG:
+            return acPriDebug;
+
+        default:
+            return acPriUnknown;
+    }
+}
+
+const char * MCAN_Cat_String( MCAN_CAT category )
+{
+    static const char acCatCommand[] = "CAT_COMMAND";
+    static const char acCatResponse[] = "CAT_RESPONSE";
+    static const char acCatVehicleState[] = "CAT_VEHICLE_STATE";
+    static const char acCatSensorNode[] = "CAT_SENSORNODE";
+    static const char acCatHeartBeat[] = "CAT_HEARTBEAT";
+    static const char acCatDebug[] = "CAT_DEBUG";
+    static const char acCatUnknown[] = "?????????????????";
+
+    switch(category)
+    {
+        case CAT_COMMAND:
+            return acCatCommand;
+
+        case CAT_RESPONSE:
+            return acCatResponse;
+
+        case CAT_VEHICLE_STATE:
+            return acCatVehicleState;
+
+        case CAT_SENSORNODE:
+            return acCatSensorNode;
+
+        case CAT_HEARTBEAT:
+            return acCatHeartBeat;
+
+        case CAT_DEBUG:
+            return acCatDebug;
+
+        default:
+            return acCatUnknown;
+    }
+}
+
+
+const char * MCAN_Dev_String( MCAN_DEV device )
+{
+    static const char acDevPower[] = "DEV_POWER";
+    static const char acDevCompute[] = "DEV_COMPUTE";
+    static const char acDevDeployment[] = "DEV_DEPLOYMENT";
+    static const char acDevMio[] = "DEV_MIO";
+    static const char acDevMtusc[] = "DEV_MTUSC";
+    static const char acDevDebug[] = "DEV_DEBUG";
+    static const char acDevAll[] = "DEV_ALL";
+    static const char acDevUnknown[] = "??????????????";
+
+    if(device == DEV_ALL)
+    {
+        return acDevAll;
+    }
+
+    switch(device)
+    {
+        case DEV_POWER:
+            return acDevPower;
+        
+        case DEV_COMPUTE:
+            return acDevCompute;
+
+        case DEV_DEPLOYMENT:
+            return acDevDeployment;
+
+        case DEV_MIO:
+            return acDevMio;
+
+        case DEV_MTUSC:
+            return acDevMtusc;
+
+        case DEV_DEBUG:
+            return acDevDebug;
+
+        default:
+            return acDevUnknown;
+    }
+}
+
+
 
 static inline uint16_t _MCAN_GetTimestamp( void )
 {
@@ -464,6 +569,11 @@ bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
     return true;
 }
 
+__weak void MCAN_RX_GetLatest(sMCAN_Message rxMessage)  
+{
+    return;
+}
+
 /*********************************************************************************
     Name: MCAN_Rx_Handler
     
@@ -480,9 +590,9 @@ bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
     Returns:
         None
 ***********************************************************************************/
-__weak void MCAN_Rx_Handler()
+__weak void MCAN_Rx_Handler(sMCAN_Message rxMessage)
 {
-    // NOP
+    return;
 }
 
 /*********************************************************************************
@@ -513,7 +623,7 @@ bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice
     
     // Interpret 32 bit idenfitier from MCAN message struct ID
     static uint32_t uIdentifier;
-    _MCAN_Conv_ID_To_Uint32(&mcanID, &uIdentifier);
+    MCAN_Conv_ID_To_Uint32(&mcanID, &uIdentifier);
 
     // Format header: assume 64 byte CANFD with flexible data rate
     FDCAN_TxHeaderTypeDef TxHeader = {
@@ -634,6 +744,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         _MCAN_Conv_Uint32_To_ID(rxHeader.Identifier, &rxMessage.mcanID);
         rxMessage.mcanID.MCAN_TimeStamp = _MCAN_GetTimestamp();
 
+        // Update latest message
+        MCAN_RX_GetLatest(rxMessage);
+
         // Add message to queue
         _MCAN_PriEnqueue(rxMessage);
 
@@ -649,11 +762,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 void thread_heartbeat(ULONG ctx)
 {
     // Select all but current device 
-    MCAN_DEV rxDevices = ALL_DEVICES & ~_mcanCurrentDevice;
+    MCAN_DEV rxDevices = DEV_ALL & ~_mcanCurrentDevice;
 
     while( true )
     {
-        MCAN_TX( MCAN_DEBUG, HEARTBEAT, rxDevices, heartbeatDataBuf);
+        MCAN_TX( MCAN_DEBUG, CAT_HEARTBEAT, rxDevices, heartbeatDataBuf);
         tx_thread_sleep(heartbeatPeriod);
     }
 }

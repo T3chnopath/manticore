@@ -19,12 +19,12 @@ typedef enum {
 } MCAN_PRI;
 
 typedef enum {
-    COMMAND,
-    RESPONSE,
-    VEHICLE_STATE,
-    SENSORNODE,
-    HEARTBEAT,
-    DEBUG,
+    CAT_COMMAND,
+    CAT_RESPONSE,
+    CAT_VEHICLE_STATE,
+    CAT_SENSORNODE,
+    CAT_HEARTBEAT,
+    CAT_DEBUG,
 } MCAN_CAT;
 
 typedef enum {
@@ -35,7 +35,7 @@ typedef enum {
     DEV_MTUSC      = 1 << 4,
     DEV_DEBUG      = 1 << 5,
 } MCAN_DEV;
-static const MCAN_DEV ALL_DEVICES = 0x3F;
+static const MCAN_DEV DEV_ALL = 0x3F;
 
 typedef struct{
     MCAN_PRI MCAN_PRIORITY;
@@ -55,13 +55,22 @@ typedef struct
 bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter);
 
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
-__weak void MCAN_RX_Handler( sMCAN_Message mcanRxMessage ); // Called by ISR 
+
+__weak void MCAN_RX_GetLatest( sMCAN_Message mcanRxMessage ); // Get the latest MCAN message in the arg
+__weak void MCAN_RX_Handler( sMCAN_Message mcanRxMessage );   // Called by ISR 
 
 bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 
 void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
+
+// Helper function for conversion
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
+
+const char * MCAN_Pri_String( MCAN_PRI priority);
+const char * MCAN_Cat_String( MCAN_CAT category);
+const char * MCAN_Dev_String( MCAN_DEV device);
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
 
