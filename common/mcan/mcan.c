@@ -33,7 +33,7 @@ static const MCAN_DEV _mcanCurrentDevice = DEV_MTUSC;
     #error "No valid MCAN device defined!"
 #endif
 
-#define UINT12_MAX 4096
+#define UINT12_MAX (2 << 11)
 #define MCAN_QUEUE_SIZE 20
 #define MCAN_PRI_COUNT 4
 
@@ -96,7 +96,6 @@ static const uint8_t uThreadConsumerDelay = 10;
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
 static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter );
 void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
-static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 static uint16_t _MCAN_GetTimestamp( void );
 
 // Queue Functions
@@ -207,7 +206,7 @@ static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
     // Bitmask to configure selected filters
     for(MCAN_DEV dev = DEV_POWER; dev <= DEV_DEBUG; dev = dev << 1)
     {
-        if ( (mcanRxFilter & dev) && dev != _mcanCurrentDevice )
+        if ( mcanRxFilter & dev )
         {
             sFilterConfig.FilterIndex = filterIndex++;
             sFilterConfig.FilterID1   = mcanRxFilter << kMCAN_SHIFT_RxDevice;
@@ -235,7 +234,7 @@ static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
     Returns:
         None
 ***********************************************************************************/
-static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
+void MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
     mcanID->MCAN_PRIORITY  |= (uIdentifier & mMCAN_Priority)  >> kMCAN_SHIFT_Priority;
     mcanID->MCAN_CAT       |= (uIdentifier & mMCAN_Cat)       >> kMCAN_SHIFT_Cat;
@@ -277,16 +276,16 @@ const char * MCAN_Pri_String( MCAN_PRI priority )
 
     switch(priority)
     {
-        case MCAN_EMERGENCY:
+        case PRI_EMERGENCY:
             return acPriEmergency;
         
-        case MCAN_ERROR:
+        case PRI_ERROR:
             return acPriError;
 
-        case MCAN_WARNING:
+        case PRI_WARNING:
             return acPriWarning;
 
-        case MCAN_DEBUG:
+        case PRI_DEBUG:
             return acPriDebug;
 
         default:
@@ -375,7 +374,7 @@ const char * MCAN_Dev_String( MCAN_DEV device )
 
 static inline uint16_t _MCAN_GetTimestamp( void )
 {
-    return (HAL_GetTick() / 1000) % UINT12_MAX;
+    return (_tx_time_get() / 1000) % UINT12_MAX;
 }
 
 
@@ -741,7 +740,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         }
 
         // Insert ID and timestamp into the message
-        _MCAN_Conv_Uint32_To_ID(rxHeader.Identifier, &rxMessage.mcanID);
+        MCAN_Conv_Uint32_To_ID(rxHeader.Identifier, &rxMessage.mcanID);
         rxMessage.mcanID.MCAN_TimeStamp = _MCAN_GetTimestamp();
 
         // Update latest message
@@ -766,7 +765,7 @@ void thread_heartbeat(ULONG ctx)
 
     while( true )
     {
-        MCAN_TX( MCAN_DEBUG, CAT_HEARTBEAT, rxDevices, heartbeatDataBuf);
+        MCAN_TX( PRI_DEBUG, CAT_HEARTBEAT, rxDevices, heartbeatDataBuf);
         tx_thread_sleep(heartbeatPeriod);
     }
 }

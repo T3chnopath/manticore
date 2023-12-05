@@ -28,14 +28,11 @@ typedef struct
 void ConsoleInit(UART_HandleTypeDef *ConsoleUart);
 
 char ConsoleInChar(void);
+bool ConsoleDetectCtrlC(void);
 char ConsoleInCharFilter(char charFilter[], uint8_t filterSize);    // Wait for input char in filter
 
 // Populate inString when ENTER pressed or max length reached
 void ConsoleInString(char inString[], uint8_t stringMaxLen);                             
-
-// Populate inString until a character in the filter is matched. Will return the value of the filter matched.
-// Will return NULL if terminated via max string length or enter;
-char ConsoleInStringFilter(char inString[], uint8_t stringMaxLen, char charFilter[], uint8_t filterSize);
 
 void ConsoleClear(void);
 bool ConsolePrint(char message[], ...);

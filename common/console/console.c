@@ -16,7 +16,7 @@ static char ConsoleOutBuff[CONSOLE_MAX_CHAR];
 static TX_MUTEX ConsoleOutBuffMutex;
 
 #define MAX_COMMANDS 10
-#define MAX_COMMAND_ARGS 4
+#define MAX_COMMAND_ARGS 11
 #define ARG_STRING_BUFF_SIZE 30
 #define COMM_HELP_SPACING 15
 static uint8_t registeredCommands = 0;
@@ -31,7 +31,8 @@ static const char unlockString[] = "console";
 static const char ENTER = '\r';
 static const char DEL = 127;
 static const char BACKSPACE = '\b';
-static const uint8_t IN_CHAR_SLEEP = 10;
+static const char CTRL_C = '\003';
+static const uint8_t IN_CHAR_SLEEP = 50;
 
 static bool enableLogging = false;
 
@@ -60,30 +61,21 @@ int8_t _findCommIndex(char commName[]);                  // Find command in the 
 
 void _consoleUnlock(void)
 {
-    uint8_t len = strlen(unlockString);
-    char inBuff[sizeof(unlockString)/sizeof(char)];
-    bool equalFlag = false;
+    uint8_t stringMaxLen = strlen(unlockString);
+    char inString[sizeof(unlockString) / sizeof(char)];
 
     while(true)
     {
-        for(uint8_t i = 0; i < len; i++)
-        {
-            inBuff[i] = ConsoleInCharFilter(unlockString, len); 
-            if (unlockString[i] != inBuff[i])
-            {
-                equalFlag = false;
-                break;
-            }
-            else
-            {
-                equalFlag = true;
-            }
-        }
 
-        // If equal flag, perform a strcmp to verify consecutivity
-        if(equalFlag && strcmp(unlockString, inBuff) == 0)
+        ConsoleInString(inString, stringMaxLen);
+        
+        if(strcmp(unlockString, inString) == 0)
         {
             break;
+        }
+        else
+        {
+            ConsoleClear();
         }
     }
     
@@ -189,6 +181,10 @@ char ConsoleInChar(void)
         ConsolePrint("%c", BACKSPACE);
         UART_RxChar = BACKSPACE;
     }
+    else if(UART_RxChar == CTRL_C)
+    {
+        UART_RxChar = CTRL_C;
+    }
     else
     {
         ConsolePrint("%c", UART_RxChar);
@@ -196,6 +192,17 @@ char ConsoleInChar(void)
 
     newChar = false;
     return UART_RxChar;
+}
+
+// Nonblocking ctrl C detection
+bool ConsoleDetectCtrlC(void)
+{
+    if(UART_RxChar == CTRL_C)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 char ConsoleInCharFilter(char charFilter[], uint8_t filterSize)
@@ -234,56 +241,20 @@ void ConsoleInString(char inString[], uint8_t stringMaxLen)
         }   
 
         // Remove character if backspace
-        if(inChar == BACKSPACE && stringIndex > 0)
+        else if(inChar == BACKSPACE && stringIndex > 0)
         {
             inString[--stringIndex] = (char) NULL;
         }
 
+
+        // Exit if CTRL C
+        else if(inChar == CTRL_C)
+        {
+            break;
+        }
+
         // Otherwise assign string 
         else if(inChar != BACKSPACE)
-        {
-            inString[stringIndex++] = inChar;
-        }
-    }
-}
-
-char ConsoleInStringFilter(char inString[], uint8_t stringMaxLen, char charFilter[], uint8_t filterSize)
-{
-    uint8_t stringIndex = 0;
-    char inChar;
-    while(true)
-    {
-        inChar = ConsoleInChar(); 
-
-        // Break if ENTER key or if max length reached
-        if(stringIndex == stringMaxLen)
-        {
-            return (char) NULL;
-        }   
-
-        // return enter if detected (natively filtered)
-        if(inChar == ENTER)
-        {
-            return ENTER;
-        }
-
-        // Process user filters 
-        for(uint8_t i = 0; i < filterSize; i++)
-        {
-            if(charFilter[i] == inChar)
-            {
-                return inChar;
-            }
-        }
-
-        if(inChar == BACKSPACE && stringIndex > 0)
-        {
-            inString[stringIndex] == (char) NULL;
-            stringIndex--;
-        }
-
-        // Otherwise assign string 
-        else
         {
             inString[stringIndex++] = inChar;
         }
@@ -433,7 +404,7 @@ void thread_console(ULONG ctx)
         {
             ConsolePrint("Invalid Command!");
         }
-        else if ( (_argIndex - 1) != newCommand->argumentCount)
+        else if ( _argIndex != newCommand->argumentCount)
         {
             ConsolePrint("Invalid argument Count. %s has %d arguments.", newCommand->name, newCommand->argumentCount);
         }

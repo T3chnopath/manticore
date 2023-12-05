@@ -209,7 +209,7 @@ static void _BSP_UART_Init(void)
 
     // Rx interrupt
 #ifdef UART3_EN
-    HAL_NVIC_SetPriority(USART3_IRQn, 1, 1);
+    HAL_NVIC_SetPriority(USART3_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(USART3_IRQn);
 #endif
 }

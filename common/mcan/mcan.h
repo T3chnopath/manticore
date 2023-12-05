@@ -12,10 +12,10 @@ typedef enum {
 } MCAN_EN;
 
 typedef enum {
-    MCAN_EMERGENCY,
-    MCAN_ERROR,
-    MCAN_WARNING,
-    MCAN_DEBUG,
+    PRI_EMERGENCY,
+    PRI_ERROR,
+    PRI_WARNING,
+    PRI_DEBUG,
 } MCAN_PRI;
 
 typedef enum {
@@ -67,6 +67,7 @@ void MCAN_DisableHeartBeats( void );
 
 // Helper function for conversion
 void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
+void MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
 
 const char * MCAN_Pri_String( MCAN_PRI priority);
 const char * MCAN_Cat_String( MCAN_CAT category);
