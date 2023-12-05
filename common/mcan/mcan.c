@@ -612,6 +612,8 @@ __weak void MCAN_Rx_Handler(sMCAN_Message rxMessage)
 bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
     int status = 0;
+    sMCAN_Message txMessage = {0};
+
     sMCAN_ID mcanID = {
             .MCAN_PRIORITY = mcanPri,
             .MCAN_CAT = mcanType, 
@@ -619,6 +621,9 @@ bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice
             .MCAN_TX_Device = mcanTxDevice,
             .MCAN_TimeStamp = _MCAN_GetTimestamp(),
     };
+
+    txMessage.mcanID = mcanID;
+    memcpy(txMessage.mcanData, mcanData, 8 * sizeof(uint8_t));
     
     // Interpret 32 bit idenfitier from MCAN message struct ID
     static uint32_t uIdentifier;
@@ -644,6 +649,7 @@ bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice
 
     if (status == HAL_OK)
     {
+        MCAN_RX_GetLatest(txMessage);
         return true;
     }
 
