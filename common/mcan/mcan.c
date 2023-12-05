@@ -332,7 +332,7 @@ bool _MCAN_PriQueueEmpty(void) {
     // Iterate through all queues to check if they are rempty
     for(uint8_t i = 0; i < MCAN_PRI_COUNT; i++)
     {
-        if( !_MCAN_QueueEmpty(&_mcanPriQueue.queues[i]) )
+        if( !_MCAN_QueueEmpty(&(_mcanPriQueue.queues[i]) ) )
         {
             return false;
         }
@@ -347,7 +347,7 @@ void _MCAN_PriEnqueue(sMCAN_Message message) {
 
     // Insert message into appropriate queue 
     MCAN_PRI pri = message.mcanID.MCAN_PRIORITY; 
-    _MCAN_Enqueue(&_mcanPriQueue.queues[pri], message);
+    _MCAN_Enqueue(&(_mcanPriQueue.queues[pri]), message);
 }
 
 // Dequeue an element, starting from the highest priority
@@ -660,7 +660,7 @@ void thread_heartbeat(ULONG ctx)
 
 void thread_queue_consumer(ULONG ctx)
 {
-    static const sMCAN_Message mcanRxEmptyMessage = {0};
+    static const sMCAN_ID mcanEmptyID = {0};
     sMCAN_Message mcanRxMessage = {0};
 
     while(true)
@@ -671,11 +671,10 @@ void thread_queue_consumer(ULONG ctx)
             
             // If message is not empty, call handler
             mcanRxMessage = _MCAN_PriDequeue();
-            if(memcmp(&mcanRxEmptyMessage, &mcanRxMessage, sizeof(sMCAN_Message)) == 0)
+            if(memcmp(&mcanEmptyID, &mcanRxMessage.mcanID, sizeof(sMCAN_ID)) != 0)
             {
                 MCAN_Rx_Handler(mcanRxMessage);
             }
-
         }
         tx_thread_sleep(uThreadConsumerDelay);
     }

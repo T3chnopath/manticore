@@ -129,7 +129,7 @@ void thread_blink(ULONG ctx)
 
 void MCAN_Rx_Handler( sMCAN_Message mcanRxMessage )
 {
-    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_DEPLOYMENT )
+    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_DEBUG )
     {
         heartbeatFlag = (bool) mcanRxMessage.mcanData[0];
     } 
