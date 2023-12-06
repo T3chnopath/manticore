@@ -492,10 +492,10 @@ sMCAN_Message _MCAN_PriDequeue(void) {
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter, MCAN_EN mcanEnable )
 {
     if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
-    {
+    { 
         return false;
     }
 
@@ -515,6 +515,9 @@ bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter )
         1, 
         0, 
         TX_AUTO_START);
+
+    // Set default state
+    MCAN_SetEnableIT(mcanEnable);
 
    return true;
 }

@@ -64,8 +64,7 @@ void thread_main(ULONG ctx)
     BSP_Init();
 
     // Init App Layer
-    MCAN_Init( FDCAN1, DEV_ALL);
-    MCAN_SetEnableIT(MCAN_ENABLE);
+    MCAN_Init( FDCAN1, DEV_ALL, MCAN_ENABLE);
 
     ConsoleInit(&ConsoleUart);
     

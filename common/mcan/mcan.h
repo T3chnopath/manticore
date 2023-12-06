@@ -52,7 +52,7 @@ typedef struct
 } sMCAN_Message;
 
 // User can bitwise OR to configure device filter.
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter);
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilterm, MCAN_EN mcanEnable);
 
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
 

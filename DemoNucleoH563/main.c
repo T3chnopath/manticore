@@ -18,7 +18,7 @@ int main(void)
     /* Initialize BSP */
     BSP_Init();
 
-    MCAN_Init( FDCAN2, DEV_COMPUTE );
+    MCAN_Init( FDCAN2, DEV_COMPUTE, MCAN_ENABLE );
 
     tx_kernel_enter();
    }
@@ -40,7 +40,6 @@ void tx_application_define(void *first_unused_memory)
 
 void thread_main(ULONG ctx)
 {
-    MCAN_SetEnableIT(MCAN_ENABLE);
     bool heartbeatFlagPrevious = false;
 
     while( true )
