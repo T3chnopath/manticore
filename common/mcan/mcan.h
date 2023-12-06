@@ -12,37 +12,37 @@ typedef enum {
 } MCAN_EN;
 
 typedef enum {
-    COMMAND,
-    RESPONSE,
-    VEHICLE_STATE,
-    SENSOR_DATA,
-    LOG,
-    HEARTBEAT,
+    PRI_EMERGENCY,
+    PRI_ERROR,
+    PRI_WARNING,
+    PRI_DEBUG,
+} MCAN_PRI;
+
+typedef enum {
+    CAT_COMMAND,
+    CAT_RESPONSE,
+    CAT_VEHICLE_STATE,
+    CAT_SENSORNODE,
+    CAT_HEARTBEAT,
+    CAT_DEBUG,
 } MCAN_CAT;
 
 typedef enum {
-    DEV_POWER,
-    DEV_MAIN_COMPUTE,
-    DEV_DEPLOYMENT,
-    DEV_MIO,
-    DEV_MTUSC,
-    DEV_ALL,
-    DEV_HEARTBEAT
+    DEV_POWER      = 1 << 0,
+    DEV_COMPUTE    = 1 << 1,
+    DEV_DEPLOYMENT = 1 << 2,
+    DEV_MIO        = 1 << 3,
+    DEV_MTUSC      = 1 << 4,
+    DEV_DEBUG      = 1 << 5,
 } MCAN_DEV;
-
-typedef enum {
-    MCAN_EMERGENCY,
-    MCAN_ERROR,
-    MCAN_WARNING,
-    MCAN_DEBUG,
-} MCAN_PRI;
+static const MCAN_DEV DEV_ALL = 0x3F;
 
 typedef struct{
-    MCAN_CAT MCAN_CAT;
-    MCAN_DEV MCAN_TX_Device; // Device that is sending
-    MCAN_DEV MCAN_RX_Device; // Device that is receiving, to be received
     MCAN_PRI MCAN_PRIORITY;
-    uint32_t MCAN_TIME_STAMP;
+    MCAN_CAT MCAN_CAT;
+    MCAN_DEV MCAN_RX_Device; // Device that is receiving, to be received
+    MCAN_DEV MCAN_TX_Device; // Device that is sending
+    uint16_t MCAN_TimeStamp;
 } sMCAN_ID;
 
 typedef struct
@@ -51,18 +51,27 @@ typedef struct
     uint8_t mcanData[64];
 } sMCAN_Message;
 
-// Caller must provide bufferssS for Rx and Tx.
-
-// sMCAN_Message struct, provided by the caller, is populated with Rx content upon ISR firing
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMCAN_Message* mcanRxMessage);
+// User can bitwise OR to configure device filter.
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter);
 
 bool MCAN_SetEnableIT( MCAN_EN mcanEnable );
-__weak void MCAN_RX_Handler( void ); // Called by ISR 
 
+__weak void MCAN_RX_GetLatest( sMCAN_Message mcanRxMessage ); // Get the latest MCAN message in the arg
+__weak void MCAN_RX_Handler( sMCAN_Message mcanRxMessage );   // Called by ISR 
+
+bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] );
 
 void MCAN_EnableHeartBeats( uint32_t delay, uint8_t* heartbeatData);
 void MCAN_DisableHeartBeats( void );
+
+// Helper function for conversion
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
+void MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
+
+const char * MCAN_Pri_String( MCAN_PRI priority);
+const char * MCAN_Cat_String( MCAN_CAT category);
+const char * MCAN_Dev_String( MCAN_DEV device);
 
 FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void );
 

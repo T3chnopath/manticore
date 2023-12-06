@@ -2,52 +2,117 @@
 
 #include "stm32h5xx_hal.h"
 
-#ifdef STM32H503
+#if defined(STM32H503)
 #include "stm32h503xx.h"
-#elif STM32H563
+#elif defined(STM32H563)
 #include "stm32h563xx.h"
+#else
+    #error "No STMH5 series defined!"
 #endif
 
 #include "tx_api.h"
 #include "mcan.h"
 
-/********** Static Variables and Data Structures ********/
+// Define current device for use in CAN tx
+#if defined(DEMO_NUCLEO_H503)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEBUG;
+#elif defined(DEMO_NUCLEO_H563)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEBUG;
+#elif defined(POWER_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_POWER;
+#elif defined(COMPUTE_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MAIN_COMPUTE;
+#elif defined(DEPLOYMENT_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_DEPLOYMENT;
+#elif defined(MIO_MODULE)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MIO;
+#elif defined(MTUSC)
+static const MCAN_DEV _mcanCurrentDevice = DEV_MTUSC;
+
+#else
+    #error "No valid MCAN device defined!"
+#endif
+
+#define UINT12_MAX (2 << 11)
+#define MCAN_QUEUE_SIZE 20
+#define MCAN_PRI_COUNT 4
+
+/********** Static Data Structures ********/
 typedef enum {
-    kMCAN_SHIFT_MessageStamp = 0,
-    kMCAN_SHIFT_Priority = 16,
-    kMCAN_SHIFT_RxDevice = 18,
-    kMCAN_SHIFT_TxDevice = 22,
-    kMCAN_SHIFT_Cat     = 26,
+    kMCAN_SHIFT_Priority  = 27,
+    kMCAN_SHIFT_Cat       = 24,
+    kMCAN_SHIFT_RxDevice  = 18,
+    kMCAN_SHIFT_TxDevice  = 12,
+    kMCAN_SHIFT_TimeStamp = 0,
 } MCAN_ID_SHIFTS;
 
 typedef enum {
-    mMCAN_MessageStamp = 0xFFFF,
-    mMCAN_Priority     =   0x03 , 
-    mMCAN_RxDevice     =   0x0F ,
-    mMCAN_TxDevice     =   0x0F ,
-    kMCAN_Cat         =   0x07 ,
+    mMCAN_Priority  = 0x0003 << kMCAN_SHIFT_Priority, 
+    mMCAN_Cat       = 0x0007 << kMCAN_SHIFT_Cat,
+    mMCAN_RxDevice  = 0x003F << kMCAN_SHIFT_RxDevice,
+    mMCAN_TxDevice  = 0x003F << kMCAN_SHIFT_TxDevice,
+    mMCAN_TimeStamp = 0x0FFF << kMCAN_SHIFT_TimeStamp,
 } MCAN_ID_MASK;
 
-static const uint8_t MCAN_MAX_FILTERS = 2;
-static MCAN_DEV _currentDevice;
+typedef struct {
+    sMCAN_Message array[MCAN_QUEUE_SIZE];
+    uint8_t front;
+    uint8_t rear;
+    uint8_t size;
+} MCAN_Queue;
+
+// Priority queue holds 4 buckets organized by priority
+typedef struct {
+    MCAN_Queue queues[MCAN_PRI_COUNT];
+} MCAN_PriQueue;
+
+/********** Static Variables ********/
+static const uint8_t MCAN_MAX_FILTERS = 10;
 static FDCAN_HandleTypeDef _hfdcan ;
 static TX_MUTEX mcanTxMutex;
-static sMCAN_Message* _mcanRxMessage;
 static uint8_t* heartbeatDataBuf;
+
+// Queue Variables
+static MCAN_PriQueue _mcanPriQueue;
+
+// Thread Variables
+#define THREAD_HEARTBEAT_STACK_SIZE 256
+static TX_THREAD stThreadHeartbeat;
+static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
+static uint32_t heartbeatPeriod;
 
 #define THREAD_HEARTBEAT_STACK_SIZE 256
 static TX_THREAD stThreadHeartbeat;
 static uint8_t auThreadHeartbeatStack[THREAD_HEARTBEAT_STACK_SIZE];
 static uint32_t heartbeatPeriod;
 
+#define THREAD_QUEUE_CONSUMER_STACK_SIZE 4096
+static TX_THREAD stThreadQueueConsumer;
+static uint8_t auThreadQueueConsumerStack[THREAD_QUEUE_CONSUMER_STACK_SIZE];
+static const uint8_t uThreadConsumerDelay = 10;
+
 
 /********** Static Function Declarations ********/
 static bool _MCAN_ConfigInterface ( FDCAN_GlobalTypeDef* FDCAN_Instance );
-static bool _MCAN_ConfigFilter( void );
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
-static inline void _MCAN_Conv_Uint32_To_ID( uint32_t uIdentifier, sMCAN_ID* mcanID);
+static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter );
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier );
 static uint16_t _MCAN_GetTimestamp( void );
+
+// Queue Functions
+void _MCAN_QueueInit( MCAN_Queue *queue);
+bool _MCAN_QueueEmpty( MCAN_Queue *queue);
+bool _MCAN_QueueFull( MCAN_Queue *queue);
+void _MCAN_Enqueue( MCAN_Queue *queue, sMCAN_Message message);
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *queue);
+
+void _MCAN_PriQueueInit(void);
+bool _MCAN_PriQueueEmpty(void);
+void _MCAN_PriEnqueue(sMCAN_Message mcanMessage);
+sMCAN_Message _MCAN_PriDequeue(void);
+
+// Threads 
 static void thread_heartbeat( ULONG ctx );
+static void thread_queue_consumer( ULONG ctx);
 
 
 /***************************** Static Function Definitions *****************************/
@@ -107,44 +172,50 @@ static bool _MCAN_ConfigInterface( FDCAN_GlobalTypeDef* FDCAN_Instance )
         selection. Assumes Extended CAN2.0B style IDs.
 
     Arguments:
-        currentDevice = current module expecting reception
+        rxDevice = current module expecting reception
 
     Returns:
         True  = succesful config init
         False = config failure 
 *********************************************************************/
-static bool _MCAN_ConfigFilter( void )
+static bool _MCAN_ConfigFilter( MCAN_DEV mcanRxFilter )
 {
+    uint8_t filterIndex = 0;
     FDCAN_FilterTypeDef sFilterConfig =
     {
         .IdType        = FDCAN_EXTENDED_ID,
         .FilterType    = FDCAN_FILTER_MASK,
         .FilterConfig  = FDCAN_FILTER_TO_RXFIFO0,
-        .FilterID2     = mMCAN_RxDevice << kMCAN_SHIFT_RxDevice,                // Mask receive device
     };
 
     // Config global filters to reject incorrect IDs
     if ( HAL_FDCAN_ConfigGlobalFilter(&_hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK )
-{
+    {
         return false;
     }
 
-    // Config first filter for current device 
-    sFilterConfig.FilterIndex = 0;
-    sFilterConfig.FilterID1 = _currentDevice << kMCAN_SHIFT_RxDevice;
+    // Configure current device
+    sFilterConfig.FilterIndex = filterIndex++;
+    sFilterConfig.FilterID1   = _mcanCurrentDevice << kMCAN_SHIFT_RxDevice;
 
     if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
     {
         return false;
     }
 
-    // Config second filter for all devices: 
-    sFilterConfig.FilterIndex = 1;
-    sFilterConfig.FilterID1 = DEV_ALL << kMCAN_SHIFT_RxDevice;
-
-    if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
+    // Bitmask to configure selected filters
+    for(MCAN_DEV dev = DEV_POWER; dev <= DEV_DEBUG; dev = dev << 1)
     {
-        return false;
+        if ( mcanRxFilter & dev )
+        {
+            sFilterConfig.FilterIndex = filterIndex++;
+            sFilterConfig.FilterID1   = mcanRxFilter << kMCAN_SHIFT_RxDevice;
+
+            if ( HAL_FDCAN_ConfigFilter(&_hfdcan, &sFilterConfig) != HAL_OK )
+            {
+                return false;
+            }
+        }
     }
 
     return true; 
@@ -163,17 +234,17 @@ static bool _MCAN_ConfigFilter( void )
     Returns:
         None
 ***********************************************************************************/
-static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
+void MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanID )
 {
-    mcanID->MCAN_TIME_STAMP |= (uIdentifier >> kMCAN_SHIFT_MessageStamp) & mMCAN_MessageStamp;
-    mcanID->MCAN_PRIORITY   |= (uIdentifier >> kMCAN_SHIFT_Priority) & mMCAN_Priority;
-    mcanID->MCAN_RX_Device  |= (uIdentifier >> kMCAN_SHIFT_RxDevice) & mMCAN_RxDevice;
-    mcanID->MCAN_TX_Device  |= (uIdentifier >> kMCAN_SHIFT_TxDevice) & mMCAN_TxDevice;
-    mcanID->MCAN_CAT       |= (uIdentifier >> kMCAN_SHIFT_Cat) & kMCAN_Cat;
+    mcanID->MCAN_PRIORITY  |= (uIdentifier & mMCAN_Priority)  >> kMCAN_SHIFT_Priority;
+    mcanID->MCAN_CAT       |= (uIdentifier & mMCAN_Cat)       >> kMCAN_SHIFT_Cat;
+    mcanID->MCAN_RX_Device |= (uIdentifier & mMCAN_RxDevice)  >> kMCAN_SHIFT_RxDevice;
+    mcanID->MCAN_TX_Device |= (uIdentifier & mMCAN_TxDevice)  >> kMCAN_SHIFT_TxDevice;
+    mcanID->MCAN_TimeStamp |= (uIdentifier & mMCAN_TimeStamp) >> kMCAN_SHIFT_TimeStamp;
 }
 
 /*********************************************************************************
-    Name: _MCAN_Conv_ID_To_Uint32
+    Name: MCAN_Conv_ID_To_Uint32
     
     Description:
         Helper to convert MCAN identifiers to uint32 style HAL identifiers,
@@ -186,21 +257,220 @@ static inline void _MCAN_Conv_Uint32_To_ID(uint32_t uIdentifier, sMCAN_ID* mcanI
     Returns:
         None
 ***********************************************************************************/
-static inline void _MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
+void MCAN_Conv_ID_To_Uint32( sMCAN_ID* mcanID, uint32_t* uIdentifier )
 {
     *uIdentifier = 0;
-    *uIdentifier |= (mcanID->MCAN_TIME_STAMP << kMCAN_SHIFT_MessageStamp);
-    *uIdentifier |= (mcanID->MCAN_PRIORITY << kMCAN_SHIFT_Priority);
+    *uIdentifier |= (mcanID->MCAN_PRIORITY  << kMCAN_SHIFT_Priority);
+    *uIdentifier |= (mcanID->MCAN_CAT       << kMCAN_SHIFT_Cat);
     *uIdentifier |= (mcanID->MCAN_RX_Device << kMCAN_SHIFT_RxDevice);
     *uIdentifier |= (mcanID->MCAN_TX_Device << kMCAN_SHIFT_TxDevice);
-    *uIdentifier |= (mcanID->MCAN_CAT << kMCAN_SHIFT_Cat);
+    *uIdentifier |= (mcanID->MCAN_TimeStamp << kMCAN_SHIFT_TimeStamp);
 }
+const char * MCAN_Pri_String( MCAN_PRI priority )
+{
+    static const char acPriEmergency[] = "PRI_EMERGENCY";
+    static const char acPriError[] = "PRI_ERROR";
+    static const char acPriWarning[] = "PRI_WARNING";
+    static const char acPriDebug[] = "PRI_DEBUG";
+    static const char acPriUnknown[] = "?????????????";
+
+    switch(priority)
+    {
+        case PRI_EMERGENCY:
+            return acPriEmergency;
+        
+        case PRI_ERROR:
+            return acPriError;
+
+        case PRI_WARNING:
+            return acPriWarning;
+
+        case PRI_DEBUG:
+            return acPriDebug;
+
+        default:
+            return acPriUnknown;
+    }
+}
+
+const char * MCAN_Cat_String( MCAN_CAT category )
+{
+    static const char acCatCommand[] = "CAT_COMMAND";
+    static const char acCatResponse[] = "CAT_RESPONSE";
+    static const char acCatVehicleState[] = "CAT_VEHICLE_STATE";
+    static const char acCatSensorNode[] = "CAT_SENSORNODE";
+    static const char acCatHeartBeat[] = "CAT_HEARTBEAT";
+    static const char acCatDebug[] = "CAT_DEBUG";
+    static const char acCatUnknown[] = "?????????????????";
+
+    switch(category)
+    {
+        case CAT_COMMAND:
+            return acCatCommand;
+
+        case CAT_RESPONSE:
+            return acCatResponse;
+
+        case CAT_VEHICLE_STATE:
+            return acCatVehicleState;
+
+        case CAT_SENSORNODE:
+            return acCatSensorNode;
+
+        case CAT_HEARTBEAT:
+            return acCatHeartBeat;
+
+        case CAT_DEBUG:
+            return acCatDebug;
+
+        default:
+            return acCatUnknown;
+    }
+}
+
+
+const char * MCAN_Dev_String( MCAN_DEV device )
+{
+    static const char acDevPower[] = "DEV_POWER";
+    static const char acDevCompute[] = "DEV_COMPUTE";
+    static const char acDevDeployment[] = "DEV_DEPLOYMENT";
+    static const char acDevMio[] = "DEV_MIO";
+    static const char acDevMtusc[] = "DEV_MTUSC";
+    static const char acDevDebug[] = "DEV_DEBUG";
+    static const char acDevAll[] = "DEV_ALL";
+    static const char acDevUnknown[] = "??????????????";
+
+    if(device == DEV_ALL)
+    {
+        return acDevAll;
+    }
+
+    switch(device)
+    {
+        case DEV_POWER:
+            return acDevPower;
+        
+        case DEV_COMPUTE:
+            return acDevCompute;
+
+        case DEV_DEPLOYMENT:
+            return acDevDeployment;
+
+        case DEV_MIO:
+            return acDevMio;
+
+        case DEV_MTUSC:
+            return acDevMtusc;
+
+        case DEV_DEBUG:
+            return acDevDebug;
+
+        default:
+            return acDevUnknown;
+    }
+}
+
+
 
 static inline uint16_t _MCAN_GetTimestamp( void )
 {
-    return (HAL_GetTick() / 1000) % UINT16_MAX;
+    return (_tx_time_get() / 1000) % UINT12_MAX;
 }
 
+
+// Queue functions
+
+// Initialize the queue
+void _MCAN_QueueInit(MCAN_Queue *queue) {
+    queue->front = 0;
+    queue->rear  = 0;
+    queue->size  = 0;
+}
+
+// Check if the queue is empty
+bool _MCAN_QueueEmpty(MCAN_Queue *queue) {
+    return queue->size == 0;
+}
+
+// Check if the queue is full
+bool _MCAN_QueueFull(MCAN_Queue *queue) {
+    return queue->size == MCAN_QUEUE_SIZE;
+}
+
+// Enqueue an element
+void _MCAN_Enqueue(MCAN_Queue *queue, sMCAN_Message message) {
+    if (_MCAN_QueueFull(queue)) {
+        return;
+    }
+    
+    queue->array[queue->rear] = message;
+    queue->rear = (queue->rear + 1) % MCAN_QUEUE_SIZE;
+    queue->size++;
+}
+
+// Dequeue an element
+sMCAN_Message _MCAN_Dequeue(MCAN_Queue *queue) {
+    if (_MCAN_QueueEmpty(queue)) {
+        sMCAN_Message empty = {0}; // Initialize to your default empty value
+        return empty;
+    }
+    
+    // Element equals front of the queue
+    sMCAN_Message element = queue->array[queue->front];
+    queue->front = (queue->front + 1) % MCAN_QUEUE_SIZE;
+    queue->size--;
+    return element;
+}
+
+
+// Priority Queue Functions
+void _MCAN_PriQueueInit(void) {
+    for (int i = 0; i < MCAN_PRI_COUNT; i++) {
+        _MCAN_QueueInit(&_mcanPriQueue.queues[i]);
+    }
+}
+
+// Check if the priority queue is empty
+bool _MCAN_PriQueueEmpty(void) {
+
+    // Iterate through all queues to check if they are rempty
+    for(uint8_t i = 0; i < MCAN_PRI_COUNT; i++)
+    {
+        if( !_MCAN_QueueEmpty(&(_mcanPriQueue.queues[i]) ) )
+        {
+            return false;
+        }
+    } 
+
+    // return true if all are empty
+    return true;
+}
+
+// Enqueue an element into the correct queue based on priority
+void _MCAN_PriEnqueue(sMCAN_Message message) {
+
+    // Insert message into appropriate queue 
+    MCAN_PRI pri = message.mcanID.MCAN_PRIORITY; 
+    _MCAN_Enqueue(&(_mcanPriQueue.queues[pri]), message);
+}
+
+// Dequeue an element, starting from the highest priority
+sMCAN_Message _MCAN_PriDequeue(void) {
+
+    // Iterate through queues in order of priority 
+    for (uint8_t i = 0; i < MCAN_PRI_COUNT; i++) 
+    {
+        // If queue is not empty, return
+        if (!_MCAN_QueueEmpty(&_mcanPriQueue.queues[i])) 
+        {
+            return _MCAN_Dequeue(&_mcanPriQueue.queues[i]);
+        }
+    }
+
+    // If all queues are empty, return
+    sMCAN_Message empty = {0}; 
+    return empty;
+}
 
 
 /***************************** Public Function Definitions *****************************/
@@ -216,27 +486,35 @@ static inline uint16_t _MCAN_GetTimestamp( void )
 
     Arguments:
         FDCAN_Instance = pointer to FDCAN_GlobalTypeDef instance
-        currentDevice  = current module expecting reception
-        sMCAN_Message  = pointer to MCAN Rx message buffer for reception
+        rxDevice       = current module expecting reception
 
     Returns:
         True  = succesful interface and filter configuration
         False = failed interface or filter configuration 
 ***********************************************************************************/
-bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV currentDevice, sMCAN_Message* mcanRxMessage )
+bool MCAN_Init( FDCAN_GlobalTypeDef* FDCAN_Instance, MCAN_DEV mcanRxFilter )
 {
-    _currentDevice = currentDevice;
-    _mcanRxMessage = mcanRxMessage;
-
     if ( !_MCAN_ConfigInterface( FDCAN_Instance ) )
     {
         return false;
     }
 
-   if ( !_MCAN_ConfigFilter() )
+    if ( !_MCAN_ConfigFilter( mcanRxFilter ) )
     {
         return false;
     }
+
+    // Start consumer thread
+    tx_thread_create( &stThreadQueueConsumer, 
+        "thread_queue_consumer", 
+        thread_queue_consumer, 
+        0, 
+        auThreadQueueConsumerStack, 
+        THREAD_QUEUE_CONSUMER_STACK_SIZE, 
+        1,
+        1, 
+        0, 
+        TX_AUTO_START);
 
    return true;
 }
@@ -290,6 +568,11 @@ bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
     return true;
 }
 
+__weak void MCAN_RX_GetLatest(sMCAN_Message rxMessage)  
+{
+    return;
+}
+
 /*********************************************************************************
     Name: MCAN_Rx_Handler
     
@@ -306,13 +589,13 @@ bool MCAN_SetEnableIT( MCAN_EN mcanEnable )
     Returns:
         None
 ***********************************************************************************/
-__weak void MCAN_Rx_Handler()
+__weak void MCAN_Rx_Handler(sMCAN_Message rxMessage)
 {
-    // NOP
+    return;
 }
 
 /*********************************************************************************
-    Name: MCAN_TX
+    Name: MCAN_TX_Verbose
     
     Description:
         Transmit an MCAN message, given an MCAN message struct. Struct timestamp
@@ -326,20 +609,25 @@ __weak void MCAN_Rx_Handler()
         True  = successful transmission of message
         False = failed tranmission of message
 ***********************************************************************************/
-bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
+bool MCAN_TX_Verbose( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanTxDevice, MCAN_DEV mcanRxDevice, uint8_t mcanData[64])
 {
     int status = 0;
+    sMCAN_Message txMessage = {0};
+
     sMCAN_ID mcanID = {
-            .MCAN_CAT = mcanType, 
-            .MCAN_TX_Device = _currentDevice,
-            .MCAN_RX_Device = mcanRxDevice,
             .MCAN_PRIORITY = mcanPri,
-            .MCAN_TIME_STAMP = _MCAN_GetTimestamp(),
+            .MCAN_CAT = mcanType, 
+            .MCAN_RX_Device = mcanRxDevice,
+            .MCAN_TX_Device = mcanTxDevice,
+            .MCAN_TimeStamp = _MCAN_GetTimestamp(),
     };
+
+    txMessage.mcanID = mcanID;
+    memcpy(txMessage.mcanData, mcanData, 8 * sizeof(uint8_t));
     
     // Interpret 32 bit idenfitier from MCAN message struct ID
     static uint32_t uIdentifier;
-    _MCAN_Conv_ID_To_Uint32(&mcanID, &uIdentifier);
+    MCAN_Conv_ID_To_Uint32(&mcanID, &uIdentifier);
 
     // Format header: assume 64 byte CANFD with flexible data rate
     FDCAN_TxHeaderTypeDef TxHeader = {
@@ -361,12 +649,17 @@ bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_
 
     if (status == HAL_OK)
     {
+        MCAN_RX_GetLatest(txMessage);
         return true;
     }
 
     return false;
 }
 
+bool MCAN_TX( MCAN_PRI mcanPri, MCAN_CAT mcanType, MCAN_DEV mcanRxDevice, uint8_t mcanData[64] )
+{
+    return (bool) MCAN_TX_Verbose(mcanPri, mcanType, _mcanCurrentDevice, mcanRxDevice, mcanData );
+}
 
 /********************************************************************************
  //TODO DOCUMENTATION UPDATE
@@ -440,38 +733,67 @@ FDCAN_HandleTypeDef* MCAN_GetFDCAN_Handle( void )
 ***********************************************************************************/
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
+    sMCAN_Message rxMessage = {0};
+
     // Allocate Rx Header to be populated with message data
-    FDCAN_RxHeaderTypeDef _RxHeader = { 0 };
+    FDCAN_RxHeaderTypeDef rxHeader = { 0 };
     if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
     {
         // Populate header and MCAN data 
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &_RxHeader, _mcanRxMessage->mcanData ) != HAL_OK)
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxHeader, rxMessage.mcanData ) != HAL_OK)
         {
         /* Reception Error */
         }
 
-        // Enable interrupts
+        // Insert ID and timestamp into the message
+        MCAN_Conv_Uint32_To_ID(rxHeader.Identifier, &rxMessage.mcanID);
+        rxMessage.mcanID.MCAN_TimeStamp = _MCAN_GetTimestamp();
+
+        // Update latest message
+        MCAN_RX_GetLatest(rxMessage);
+
+        // Add message to queue
+        _MCAN_PriEnqueue(rxMessage);
+
+        // Enable interrupts to receive new messages
         if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
         {
         /* Notification Error */
         }
-
-        // Interpret ID for MCAN struct from uint32 identifier
-        _MCAN_Conv_Uint32_To_ID(_RxHeader.Identifier, &_mcanRxMessage->mcanID);
-
-        // Update time stamp to be time of reception
-        _mcanRxMessage->mcanID.MCAN_TIME_STAMP = _MCAN_GetTimestamp();
-
-        MCAN_Rx_Handler();
     }
 }
 
 /***************************** Threads *****************************/
 void thread_heartbeat(ULONG ctx)
 {
+    // Select all but current device 
+    MCAN_DEV rxDevices = DEV_ALL & ~_mcanCurrentDevice;
+
     while( true )
     {
-       MCAN_TX( MCAN_DEBUG, HEARTBEAT, DEV_HEARTBEAT, heartbeatDataBuf);
-       tx_thread_sleep(heartbeatPeriod);
+        MCAN_TX( PRI_DEBUG, CAT_HEARTBEAT, rxDevices, heartbeatDataBuf);
+        tx_thread_sleep(heartbeatPeriod);
+    }
+}
+
+void thread_queue_consumer(ULONG ctx)
+{
+    static const sMCAN_ID mcanEmptyID = {0};
+    sMCAN_Message mcanRxMessage = {0};
+
+    while(true)
+    {
+        // Check if there are items in the queue 
+        if(!_MCAN_PriQueueEmpty())
+        {
+            
+            // If message is not empty, call handler
+            mcanRxMessage = _MCAN_PriDequeue();
+            if(memcmp(&mcanEmptyID, &mcanRxMessage.mcanID, sizeof(sMCAN_ID)) != 0)
+            {
+                MCAN_Rx_Handler(mcanRxMessage);
+            }
+        }
+        tx_thread_sleep(uThreadConsumerDelay);
     }
 }

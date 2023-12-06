@@ -9,7 +9,6 @@ static TX_THREAD stThreadMain;
 static uint8_t auThreadMainStack[THREAD_MAIN_STACK_SIZE];
 
 static bool heartbeatFlag = false;
-static sMCAN_Message mcanRxMessage = { 0 };
 static uint8_t heartbeatData[] = { 0xDE, 0xCA, 0XF, 0xC0, 0xFF, 0xEE, 0xCA, 0xFE};
 
 void thread_main(ULONG ctx);
@@ -19,7 +18,7 @@ int main(void)
     /* Initialize BSP */
     BSP_Init();
 
-    MCAN_Init( FDCAN2, DEV_MAIN_COMPUTE, &mcanRxMessage );
+    MCAN_Init( FDCAN2, DEV_COMPUTE );
 
     tx_kernel_enter();
    }
@@ -67,9 +66,9 @@ void thread_main(ULONG ctx)
     }
 }
 
-void MCAN_Rx_Handler( void )
+void MCAN_Rx_Handler( sMCAN_Message mcanRxMessage )
 {
-    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_MAIN_COMPUTE || mcanRxMessage.mcanID.MCAN_RX_Device == DEV_ALL )
+    if ( mcanRxMessage.mcanID.MCAN_RX_Device == DEV_COMPUTE )
     {
         heartbeatFlag = (bool) mcanRxMessage.mcanData[0];
     } 
