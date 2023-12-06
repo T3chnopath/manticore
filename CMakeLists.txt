@@ -1,4 +1,4 @@
-t if(NOT SUBTREE)
+if(NOT SUBTREE)
     cmake_minimum_required(VERSION 3.22)
     project(MantiCore)
 
