@@ -21,7 +21,7 @@ static const MCAN_DEV _mcanCurrentDevice = DEV_DEBUG;
 #elif defined(POWER_MODULE)
 static const MCAN_DEV _mcanCurrentDevice = DEV_POWER;
 #elif defined(COMPUTE_MODULE)
-static const MCAN_DEV _mcanCurrentDevice = DEV_MAIN_COMPUTE;
+static const MCAN_DEV _mcanCurrentDevice = DEV_COMPUTE;
 #elif defined(DEPLOYMENT_MODULE)
 static const MCAN_DEV _mcanCurrentDevice = DEV_DEPLOYMENT;
 #elif defined(MIO_MODULE)
