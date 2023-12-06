@@ -1,5 +1,5 @@
 # Create Library
-add_library(MCAN mcan.c)
+add_library(MCAN mcan.c sensor_nodes.c)
 
 # Link HAL Library
 target_link_libraries(MCAN MCU_Support)

@@ -314,7 +314,7 @@ const char * MCAN_Cat_String( MCAN_CAT category )
         case CAT_VEHICLE_STATE:
             return acCatVehicleState;
 
-        case CAT_SENSORNODE:
+        case CAT_SENSOR_NODE:
             return acCatSensorNode;
 
         case CAT_HEARTBEAT:
