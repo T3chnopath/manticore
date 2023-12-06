@@ -13,7 +13,7 @@ inline __attribute__((always_inline)) uint32_t Get_Freq(uint32_t systemClk, uint
     return (systemClk / (timerPrescaler+1)) / (timerPeriod+1);
 }
 
-inline __attribute__((always_inline)) int32_t map(int32_t x, int32_t x_min, int32_t x_max, int32_t out_min, int32_t out_max){
+inline __attribute__((always_inline)) float map(float x, float x_min, float x_max, float out_min, float out_max){
 	if(x <= x_min)
 		return out_min;
 
@@ -22,7 +22,6 @@ inline __attribute__((always_inline)) int32_t map(int32_t x, int32_t x_min, int3
 
 	return (x - x_min) * (out_max - out_min) / (x_max - x_min) + out_min;
 }
-
 
 inline __attribute__((always_inline)) void GPIO_PortClkEnable(GPIO_TypeDef * port)
 {
