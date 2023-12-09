@@ -2,23 +2,25 @@
 #include "utility.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include "tx_api.h"
 
 #define MAX_CLOCKWISE_SPEED_PERCENTAGE  (0.064f)
 #define ONE_POINT_FIVE_MS_PERCENTAGE    (0.075f)
 #define MAX_COUNTER_SPEED_PERCENTAGE    (0.086f)
 #define SAMPLE_CNT                      (15U)
-#define PID_Kp                          (0.025f)      
-#define PID_Ki                          (0.00025f)
-#define INTEGRAL_CAP                    (200.0)
+#define PID_Kp                          (0.00286f)      
+#define PID_Ki                          (0.000275f)
+#define PID_Kd                          (51.5f)
+#define OUTPUT_CAP                      (200.0)
 #define SERVO_SPEED_OFFSET              (30.0)
 #define ANGLE_THRESHOLD                 (2)
 #define SPEED_OFFSET                    (30.0)
 #define SERVO_MIN_TIM_US                (0)
 #define SERVO_MAX_TIM_US                (20000)
-#define ERROR_THRESHOLD                 (1.2)
+#define ERROR_THRESHOLD                 (5.0f)
 #define STEADY_STATE_CNT_THRES          (1000)
 #define INITIAL_ANGLE_OFFSET            (8)
-#define INTEGRAL_RESET_THRESHOLD        (1000)
+#define INTEGRAL_RESET_THRESHOLD        (6000)
 
 //Local Scope Typedef
 typedef enum{
@@ -275,6 +277,8 @@ Servo_Error CONT_Servo_Init(CONT_Servo_Instance_t* contServo){
     HAL_TIM_IC_Stop(contServo->ICTimer, contServo->ICTimerChannel);
     captureState = CAPTURE_NEXT_RISING;
 
+    //Drive_CONT_Servo_Angle(contServo, 20, SERVO_COUNTERCLOCKWISE);
+
     // Zero out Servo
     if((180 - currAngle) > 0)
         Drive_CONT_Servo_Angle(contServo, 180 - currAngle, SERVO_COUNTERCLOCKWISE);
@@ -286,13 +290,15 @@ Servo_Error CONT_Servo_Init(CONT_Servo_Instance_t* contServo){
 
 Servo_Error Drive_CONT_Servo_Angle(CONT_Servo_Instance_t* contServo, int16_t angle, CSERVO_DIR dir){
 
-    static float targetAngle = 0.0;
+    float targetAngle = 0.0;
     static float detectedAngle = 0.0;
-    float detectedDuty = 0.0;
+	float detectedDuty = 0.0;
     float output = 0.0;
     static float error = 0.0;
     float pError = 0.0;
     float iError = 0.0;
+    float dError = 0.0;
+    float sumError = 0.0;
     float prevError = 0.0;
     float offset = 0.0;
     uint16_t steadyStateCnt = 0;
@@ -360,16 +366,22 @@ Servo_Error Drive_CONT_Servo_Angle(CONT_Servo_Instance_t* contServo, int16_t ang
 
         pError = PID_Kp * error;
 
-        iError = PID_Ki * (prevError + error);
+        iError = PID_Ki * (sumError + error);
 
-        prevError += error;
+        dError = PID_Kd * (error - prevError);
 
-        output = pError + iError;
+        // Summation of Error for Integral
+        sumError += error;
+
+        // Save prevError as current error for Derivitive 
+        prevError = error;
+
+        output = pError + iError + dError;
 
         // Cap Output to make sure we don't exceed PWM Limit
-        if(output > INTEGRAL_CAP)
+        if(output > OUTPUT_CAP)
             output = 200.0;
-        else if(output < -INTEGRAL_CAP)
+        else if(output < -OUTPUT_CAP)
             output = -200.0;
 
         // Counter Speed Offset
@@ -388,10 +400,12 @@ Servo_Error Drive_CONT_Servo_Angle(CONT_Servo_Instance_t* contServo, int16_t ang
         integralResetCnt++;
         if(integralResetCnt > INTEGRAL_RESET_THRESHOLD){
             integralResetCnt = 0;
-            prevError = 0;
+            sumError = 0;
         }
 
         captureState = CAPTURE_NEXT_RISING;   
+
+        _tx_thread_sleep(1);
 
     }
 
