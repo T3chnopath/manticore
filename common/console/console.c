@@ -65,6 +65,9 @@ void _consoleUnlock(void)
     uint8_t stringMaxLen = strlen(unlockString);
     char inString[sizeof(unlockString) / sizeof(char)];
 
+    // Prompt printout
+    ConsolePrint("Enter Password: \r\n");
+
     while(true)
     {
 
