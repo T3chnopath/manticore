@@ -32,6 +32,7 @@ static const char ENTER = '\r';
 static const char DEL = 127;
 static const char BACKSPACE = '\b';
 static const char CTRL_C = '\003';
+static const char NULL_CHAR = '\0';
 static const uint8_t IN_CHAR_SLEEP = 50;
 
 static bool enableLogging = false;
@@ -259,6 +260,9 @@ void ConsoleInString(char inString[], uint8_t stringMaxLen)
             inString[stringIndex++] = inChar;
         }
     }
+
+    // Force null termination
+    inString[stringIndex] = NULL_CHAR;
 }
 
 
